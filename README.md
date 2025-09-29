@@ -44,7 +44,7 @@ Add this line to your `Packages/manifest.json`:
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Scene Setup
 

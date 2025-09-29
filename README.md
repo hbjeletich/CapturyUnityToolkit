@@ -37,7 +37,7 @@ Add this line to your `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.yourname.motiontracking": "https://github.com/hbjeletich/CapturyUnityToolkit.git"
+    "com.hbjeletich.capturytoolkit": "https://github.com/hbjeletich/CapturyUnityToolkit.git"
   }
 }
 ```

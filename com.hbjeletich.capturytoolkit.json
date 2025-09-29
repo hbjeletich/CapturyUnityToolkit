@@ -1,0 +1,27 @@
+{
+  "name": "com.hbjeletich.capturytoolkit",
+  "version": "1.0.0",
+  "displayName": "Captury Motion Tracking Toolkit",
+  "description": "Unity motion tracking toolkit using Captury and Input System for torso, foot, arm, and head tracking with walk and gait analysis",
+  "unity": "2020.3",
+  "dependencies": {
+    "com.unity.inputsystem": "1.4.0"
+  },
+  "keywords": [
+    "motion capture",
+    "tracking",
+    "captury",
+    "input system",
+    "mocap",
+    "gait",
+    "biomechanics"
+  ],
+  "author": {
+    "name": "hbjeletich",
+    "url": "https://github.com/hbjeletich"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hbjeletich/CapturyUnityToolkit.git"
+  }
+}

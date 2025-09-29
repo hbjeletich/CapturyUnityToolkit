@@ -1,0 +1,63 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3c0ac5af9e504174082cd7401bffa208, type: 3}
+  m_Name: TestConfig
+  m_EditorClassIdentifier: 
+  configurationName: Default
+  description: Default motion tracking setup
+  calibrationDelay: 1
+  calibrationFrames: 30
+  enableTorsoModule: 0
+  torsoSensitivity: 1
+  torsoDebugMode: 1
+  isShiftTracked: 1
+  weightShiftThreshold: 0.2
+  neutralZoneWidth: 0.075
+  wholeBodyMovementThreshold: 3
+  isBendTracked: 1
+  bentOverAngleThreshold: 30
+  enableFootModule: 1
+  footSensitivity: 1
+  footDebugMode: 1
+  isFootRaiseTracked: 0
+  footRaiseThreshold: 0.1
+  isHipAbductionTracked: 0
+  minAbductionDistance: 0.2
+  minLiftHeight: 0.05
+  isFootPositionTracked: 0
+  useRelativeFootPosition: 1
+  enableWalkTracking: 1
+  walkSpeedThreshold: 1
+  minimumWalkDuration: 1
+  walkStopThreshold: 0.8
+  enableGaitAnalysis: 1
+  minimumCyclesForAnalysis: 3
+  maxReasonableStepTime: 2
+  minReasonableStepTime: 0.3
+  positionHistoryFrames: 300
+  eventHistoryCount: 20
+  enableHeadModule: 0
+  headSensitivity: 1
+  headDebugMode: 0
+  enableArmsModule: 0
+  armsSensitivity: 1
+  armsDebugMode: 0
+  enableLegsModule: 0
+  legsSensitivity: 1
+  legsDebugMode: 0
+  pelvisJointName: Hips
+  spineJointName: Spine4
+  headJointName: Head
+  leftShoulderJointName: LeftShoulder
+  rightShoulderJointName: RightShoulder
+  leftFootJointName: LeftFoot
+  rightFootJointName: RightFoot

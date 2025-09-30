@@ -6,19 +6,21 @@ using UnityEngine.InputSystem.LowLevel;
 public class HeadTrackingModule : MotionTrackingModule
 {
     // internal states
-    private bool isNodding = false;
-    private bool isShakingNo = false;
+    private bool isHeadUp = false;
+    private bool isHeadDown = false;
+    private bool isHeadLeft = false;
+    private bool isHeadRight = false;
 
     // tracking transforms
     private Vector3 neutralHeadPosition = Vector3.zero;
+    private Vector3 neutralNeckPosition = Vector3.zero;
     private Vector3 neutralHeadRotation = Vector3.zero;
-    private Transform trackedHead = null;
+    private Vector3 neutralNeckRotation = Vector3.zero;
+    private Vector3 neutralHeadToNeckOffset = Vector3.zero;
+    private Vector3 neutralHeadToNeckRotationOffset = Vector3.zero;
 
-    // gesture detection
-    private float lastNodTime = 0f;
-    private float lastShakeTime = 0f;
-    private float nodGestureStartTime = 0f;
-    private float shakeGestureStartTime = 0f;
+    private Transform trackedHead = null;
+    private Transform trackedNeck = null;
 
     // get from config
     public override bool IsEnabled => manager?.Config?.enableHeadModule ?? false;
@@ -27,17 +29,14 @@ public class HeadTrackingModule : MotionTrackingModule
 
     public bool IsHeadPositionTracked => manager?.Config?.isHeadPositionTracked ?? true;
     public bool IsHeadRotationTracked => manager?.Config?.isHeadRotationTracked ?? true;
-    public bool IsNodDetectionEnabled => manager?.Config?.isNodDetectionEnabled ?? true;
-    public bool IsShakeDetectionEnabled => manager?.Config?.isShakeDetectionEnabled ?? true;
+    public bool IsDirectionDetectionEnabled => manager?.Config?.isHeadDirectionEnabled ?? true;
     public bool UseRelativeHeadPosition => manager?.Config?.useRelativeHeadPosition ?? true;
 
-    // gesture thresholds
-    public float NodThreshold => manager?.Config?.nodThreshold ?? 15f;
-    public float ShakeThreshold => manager?.Config?.shakeThreshold ?? 20f;
-    public float NodSpeed => manager?.Config?.nodSpeed ?? 0.5f;
-    public float ShakeSpeed => manager?.Config?.shakeSpeed ?? 0.7f;
-    public float GestureTimeout => manager?.Config?.gestureTimeout ?? 2.0f;
-    public float NeutralReturnThreshold => manager?.Config?.neutralReturnThreshold ?? 5f;
+    // direction thresholds (in degrees for rotation)
+    public float HeadUpThreshold => manager?.Config?.headUpThreshold ?? 15f;
+    public float HeadDownThreshold => manager?.Config?.headDownThreshold ?? 15f;
+    public float HeadLeftThreshold => manager?.Config?.headLeftThreshold ?? 20f;
+    public float HeadRightThreshold => manager?.Config?.headRightThreshold ?? 20f;
 
     #region Initialize, Calibrate, Joints
 
@@ -48,7 +47,7 @@ public class HeadTrackingModule : MotionTrackingModule
         if (manager?.Config != null)
         {
             Debug.Log($"HeadTrackingModule: Settings - Enabled: {IsEnabled}, Debug: {DebugMode}, " +
-                     $"NodDetection: {IsNodDetectionEnabled}, ShakeDetection: {IsShakeDetectionEnabled}");
+                     $"DirectionDetection: {IsDirectionDetectionEnabled}");
         }
     }
 
@@ -56,28 +55,40 @@ public class HeadTrackingModule : MotionTrackingModule
     {
         Debug.Log("HeadTrackingModule: Calibrate() called");
         Transform head = GetHeadJoint(joints);
+        Transform neck = GetNeckJoint(joints);
 
-        if (head != null)
+        if (head != null && neck != null)
         {
             trackedHead = head;
+            trackedNeck = neck;
+
             neutralHeadPosition = head.position;
+            neutralNeckPosition = neck.position;
             neutralHeadRotation = head.eulerAngles;
+            neutralNeckRotation = neck.eulerAngles;
+
+            // calculate and store offsets
+            neutralHeadToNeckOffset = neutralHeadPosition - neutralNeckPosition;
+            neutralHeadToNeckRotationOffset = NormalizeEulerAngles(neutralHeadRotation - neutralNeckRotation);
 
             isCalibrated = true;
 
             Debug.Log("HeadTrackingModule: Successfully calibrated! " +
-                     $"Neutral Position: {neutralHeadPosition:F3}, Neutral Rotation: {neutralHeadRotation:F3}");
+                     $"Neutral Head: {neutralHeadPosition:F3}, Neutral Neck: {neutralNeckPosition:F3}, " +
+                     $"Neutral Head Rotation: {neutralHeadRotation:F3}, Neutral Neck Rotation: {neutralNeckRotation:F3}, " +
+                     $"Neutral Rotation Offset: {neutralHeadToNeckRotationOffset:F3}");
         }
         else
         {
-            Debug.LogError($"HeadTrackingModule: Failed to calibrate - missing head joint!");
+            Debug.LogError($"HeadTrackingModule: Failed to calibrate - missing joints! " +
+                          $"Head: {head != null}, Neck: {neck != null}");
             isCalibrated = false;
         }
     }
 
     public override bool HasRequiredJoints(Transform[] joints)
     {
-        bool hasJoints = GetHeadJoint(joints) != null;
+        bool hasJoints = GetHeadJoint(joints) != null && GetNeckJoint(joints) != null;
         if (DebugMode) Debug.Log($"HeadTrackingModule: HasRequiredJoints = {hasJoints}");
         return hasJoints;
     }
@@ -85,7 +96,8 @@ public class HeadTrackingModule : MotionTrackingModule
     public override string[] GetRequiredJointNames()
     {
         return new string[] {
-            manager?.Config?.headJointName ?? "Head"
+            manager?.Config?.headJointName ?? "Head",
+            manager?.Config?.neckJointName ?? "Neck"
         };
     }
 
@@ -105,6 +117,22 @@ public class HeadTrackingModule : MotionTrackingModule
         return head;
     }
 
+    private Transform GetNeckJoint(Transform[] joints)
+    {
+        string neckName = manager?.Config?.neckJointName ?? "Neck";
+        Transform neck = manager?.GetJointByName(neckName);
+
+        if (DebugMode)
+        {
+            if (neck == null)
+                Debug.LogWarning($"HeadTrackingModule: Could not find neck joint '{neckName}'");
+            else
+                Debug.Log($"HeadTrackingModule: Found neck joint '{neckName}' at position {neck.position}");
+        }
+
+        return neck;
+    }
+
     #endregion
     #region Update Functions
 
@@ -120,169 +148,110 @@ public class HeadTrackingModule : MotionTrackingModule
             return;
         }
 
-        if (trackedHead == null)
+        if (trackedHead == null || trackedNeck == null)
         {
             if (DebugMode && Time.frameCount % 300 == 0)
-                Debug.Log($"HeadTrackingModule: Missing tracked head joint");
+                Debug.Log($"HeadTrackingModule: Missing tracked joints - Head: {trackedHead != null}, Neck: {trackedNeck != null}");
             return;
         }
 
         Vector3 currentHeadPosition = trackedHead.position;
+        Vector3 currentNeckPosition = trackedNeck.position;
         Vector3 currentHeadRotation = trackedHead.eulerAngles;
+        Vector3 currentNeckRotation = trackedNeck.eulerAngles;
+
+        // calculate current head-to-neck offset
+        Vector3 currentHeadToNeckOffset = currentHeadPosition - currentNeckPosition;
+        Vector3 relativePositionMovement = currentHeadToNeckOffset - neutralHeadToNeckOffset;
+
+        // calculate current head-to-neck rotation offset
+        Vector3 currentHeadToNeckRotationOffset = NormalizeEulerAngles(currentHeadRotation - currentNeckRotation);
+        Vector3 relativeRotationMovement = NormalizeEulerAngles(currentHeadToNeckRotationOffset - neutralHeadToNeckRotationOffset);
 
         // update head position
         if (IsHeadPositionTracked)
-            UpdateHeadPosition(ref state, currentHeadPosition);
+            UpdateHeadPosition(ref state, relativePositionMovement);
 
         // update head rotation
         if (IsHeadRotationTracked)
-            UpdateHeadRotation(ref state, currentHeadRotation);
+            UpdateHeadRotation(ref state, relativeRotationMovement);
 
-        // update gesture detection
-        if (IsNodDetectionEnabled)
-            UpdateNodDetection(ref state, currentHeadRotation);
-
-        if (IsShakeDetectionEnabled)
-            UpdateShakeDetection(ref state, currentHeadRotation);
+        // update directional detection based on relative rotation
+        if (IsDirectionDetectionEnabled)
+            UpdateHeadDirection(ref state, relativeRotationMovement);
     }
 
-    private void UpdateHeadPosition(ref CapturyInputState state, Vector3 currentPosition)
+    private void UpdateHeadPosition(ref CapturyInputState state, Vector3 relativeMovement)
     {
         if (UseRelativeHeadPosition)
         {
-            state.headPosition = (currentPosition - neutralHeadPosition) * Sensitivity;
+            state.headPosition = relativeMovement * Sensitivity;
         }
         else
         {
-            state.headPosition = currentPosition * Sensitivity;
+            state.headPosition = trackedHead.position * Sensitivity;
         }
     }
 
-    private void UpdateHeadRotation(ref CapturyInputState state, Vector3 currentRotation)
+    private void UpdateHeadRotation(ref CapturyInputState state, Vector3 relativeRotation)
     {
-        Vector3 relativeRotation = NormalizeEulerAngles(currentRotation - neutralHeadRotation);
+        // rotation relative to neck
         state.headRotation = relativeRotation * Sensitivity;
     }
 
-    private void UpdateNodDetection(ref CapturyInputState state, Vector3 currentRotation)
+    private void UpdateHeadDirection(ref CapturyInputState state, Vector3 relativeRotation)
     {
-        Vector3 relativeRotation = NormalizeEulerAngles(currentRotation - neutralHeadRotation);
-        float pitchAngle = relativeRotation.x;
+        // Roll (Z rotation) - negative is looking up, positive is looking down
+        float pitchAngle = relativeRotation.z;
 
-        float currentTime = Time.time;
-        bool significantNodMovement = Mathf.Abs(pitchAngle) > NodThreshold;
-
-        if (significantNodMovement)
-        {
-            if (!isNodding)
-            {
-                // start of nod gesture
-                isNodding = true;
-                nodGestureStartTime = currentTime;
-                state.headNodding = 1.0f;
-
-                if (DebugMode)
-                    Debug.Log($"HeadTrackingModule: NOD STARTED! Pitch: {pitchAngle:F1}°");
-            }
-            else
-            {
-                // continue nodding
-                state.headNodding = 1.0f;
-            }
-
-            lastNodTime = currentTime;
-        }
-        else if (isNodding)
-        {
-            // check if we should stop nodding (returned to neutral or timeout)
-            bool returnedToNeutral = Mathf.Abs(pitchAngle) < NeutralReturnThreshold;
-            bool timedOut = (currentTime - lastNodTime) > NodSpeed;
-
-            if (returnedToNeutral || timedOut)
-            {
-                isNodding = false;
-                state.headNodding = 0.0f;
-
-                if (DebugMode)
-                    Debug.Log($"HeadTrackingModule: NOD ENDED! Reason: {(returnedToNeutral ? "Returned to neutral" : "Timeout")}");
-            }
-            else
-            {
-                state.headNodding = 1.0f;
-            }
-        }
-        else
-        {
-            state.headNodding = 0.0f;
-        }
-
-        // time out old gestures
-        if (isNodding && (currentTime - nodGestureStartTime) > GestureTimeout)
-        {
-            isNodding = false;
-            state.headNodding = 0.0f;
-            if (DebugMode) Debug.Log("HeadTrackingModule: Nod gesture timed out");
-        }
-    }
-
-    private void UpdateShakeDetection(ref CapturyInputState state, Vector3 currentRotation)
-    {
-        Vector3 relativeRotation = NormalizeEulerAngles(currentRotation - neutralHeadRotation);
+        // Yaw (Y rotation) - negative is looking left, positive is looking right
         float yawAngle = relativeRotation.y;
 
-        float currentTime = Time.time;
-        bool significantShakeMovement = Mathf.Abs(yawAngle) > ShakeThreshold;
-
-        if (significantShakeMovement)
+        // HEAD UP detection (negative)
+        bool headUpNow = pitchAngle < -HeadUpThreshold;
+        if (headUpNow != isHeadUp)
         {
-            if (!isShakingNo)
-            {
-                // start of shake gesture
-                isShakingNo = true;
-                shakeGestureStartTime = currentTime;
-                state.headShaking = 1.0f;
-
-                if (DebugMode)
-                    Debug.Log($"HeadTrackingModule: SHAKE STARTED! Yaw: {yawAngle:F1}°");
-            }
-            else
-            {
-                // continue shaking
-                state.headShaking = 1.0f;
-            }
-
-            lastShakeTime = currentTime;
+            isHeadUp = headUpNow;
+            if (DebugMode)
+                Debug.Log($"HeadTrackingModule: HEAD {(isHeadUp ? "UP" : "NEUTRAL (vertical)")} - Pitch: {pitchAngle:F1}°");
         }
-        else if (isShakingNo)
+        state.headUp = isHeadUp ? 1.0f : 0.0f;
+
+        // HEAD DOWN detection (positive)
+        bool headDownNow = pitchAngle > HeadDownThreshold;
+        if (headDownNow != isHeadDown)
         {
-            // check if we should stop shaking (returned to neutral or timeout)
-            bool returnedToNeutral = Mathf.Abs(yawAngle) < NeutralReturnThreshold;
-            bool timedOut = (currentTime - lastShakeTime) > ShakeSpeed;
-
-            if (returnedToNeutral || timedOut)
-            {
-                isShakingNo = false;
-                state.headShaking = 0.0f;
-
-                if (DebugMode)
-                    Debug.Log($"HeadTrackingModule: SHAKE ENDED! Reason: {(returnedToNeutral ? "Returned to neutral" : "Timeout")}");
-            }
-            else
-            {
-                state.headShaking = 1.0f;
-            }
+            isHeadDown = headDownNow;
+            if (DebugMode)
+                Debug.Log($"HeadTrackingModule: HEAD {(isHeadDown ? "DOWN" : "NEUTRAL (vertical)")} - Pitch: {pitchAngle:F1}°");
         }
-        else
-        {
-            state.headShaking = 0.0f;
-        }
+        state.headDown = isHeadDown ? 1.0f : 0.0f;
 
-        // time out old gestures
-        if (isShakingNo && (currentTime - shakeGestureStartTime) > GestureTimeout)
+        // HEAD LEFT detection (negative)
+        bool headLeftNow = yawAngle < -HeadLeftThreshold;
+        if (headLeftNow != isHeadLeft)
         {
-            isShakingNo = false;
-            state.headShaking = 0.0f;
-            if (DebugMode) Debug.Log("HeadTrackingModule: Shake gesture timed out");
+            isHeadLeft = headLeftNow;
+            if (DebugMode)
+                Debug.Log($"HeadTrackingModule: HEAD {(isHeadLeft ? "LEFT" : "NEUTRAL (horizontal)")} - Yaw: {yawAngle:F1}°");
+        }
+        state.headLeft = isHeadLeft ? 1.0f : 0.0f;
+
+        // HEAD RIGHT detection (positive)
+        bool headRightNow = yawAngle > HeadRightThreshold;
+        if (headRightNow != isHeadRight)
+        {
+            isHeadRight = headRightNow;
+            if (DebugMode)
+                Debug.Log($"HeadTrackingModule: HEAD {(isHeadRight ? "RIGHT" : "NEUTRAL (horizontal)")} - Yaw: {yawAngle:F1}°");
+        }
+        state.headRight = isHeadRight ? 1.0f : 0.0f;
+
+        // log all values periodically for debugging
+        if (DebugMode && Time.frameCount % 120 == 0)
+        {
+            Debug.Log($"HeadTrackingModule: Pitch={pitchAngle:F1}°, Yaw={yawAngle:F1}° | " +
+                     $"Up={isHeadUp}, Down={isHeadDown}, Left={isHeadLeft}, Right={isHeadRight}");
         }
     }
 
@@ -309,20 +278,33 @@ public class HeadTrackingModule : MotionTrackingModule
 
     public void RecalibrateHeadModule()
     {
-        if (trackedHead != null)
+        if (trackedHead != null && trackedNeck != null)
         {
-            Transform[] joints = { trackedHead };
+            Transform[] joints = { trackedHead, trackedNeck };
             Calibrate(joints);
         }
     }
 
-    public bool GetIsNodding() => isNodding;
-    public bool GetIsShaking() => isShakingNo;
+    public bool GetIsHeadUp() => isHeadUp;
+    public bool GetIsHeadDown() => isHeadDown;
+    public bool GetIsHeadLeft() => isHeadLeft;
+    public bool GetIsHeadRight() => isHeadRight;
 
     public Vector3 GetCurrentHeadPosition() => trackedHead?.position ?? Vector3.zero;
     public Vector3 GetCurrentHeadRotation() => trackedHead?.eulerAngles ?? Vector3.zero;
-    public Vector3 GetRelativeHeadRotation() =>
-        trackedHead != null ? NormalizeEulerAngles(trackedHead.eulerAngles - neutralHeadRotation) : Vector3.zero;
+    public Vector3 GetRelativeHeadRotation()
+    {
+        if (trackedHead == null || trackedNeck == null) return Vector3.zero;
+        Vector3 currentHeadToNeckRotationOffset = NormalizeEulerAngles(trackedHead.eulerAngles - trackedNeck.eulerAngles);
+        return NormalizeEulerAngles(currentHeadToNeckRotationOffset - neutralHeadToNeckRotationOffset);
+    }
+
+    public Vector3 GetHeadRelativeToNeck()
+    {
+        if (trackedHead == null || trackedNeck == null) return Vector3.zero;
+        Vector3 currentOffset = trackedHead.position - trackedNeck.position;
+        return currentOffset - neutralHeadToNeckOffset;
+    }
 
     #endregion
 }

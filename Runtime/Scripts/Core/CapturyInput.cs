@@ -105,10 +105,16 @@ public struct CapturyInputState : IInputStateTypeInfo
     public Vector3 headRotation;
 
     [InputControl(layout = "Button")]
-    public float headNodding;
+    public float headUp;
 
     [InputControl(layout = "Button")]
-    public float headShaking;
+    public float headDown;
+
+    [InputControl(layout = "Button")]
+    public float headLeft;
+
+    [InputControl(layout = "Button")]
+    public float headRight;
 }
 
 [InputControlLayout(stateType = typeof(CapturyInputState), displayName = "Captury Input")]
@@ -207,11 +213,17 @@ public class CapturyInput : InputDevice
     [InputControl(layout = "Vector3", displayName = "Head Rotation")]
     public Vector3Control headRotation { get; private set; }
 
-    [InputControl(layout = "Button", displayName = "Head Nodding")]
-    public ButtonControl headNodding { get; private set; }
+    [InputControl(layout = "Button", displayName = "Head Up")]
+    public ButtonControl headUp { get; private set; }
 
-    [InputControl(layout = "Button", displayName = "Head Shaking")]
-    public ButtonControl headShaking { get; private set; }
+    [InputControl(layout = "Button", displayName = "Head Down")]
+    public ButtonControl headDown { get; private set; }
+
+    [InputControl(layout = "Button", displayName = "Head Left")]
+    public ButtonControl headLeft { get; private set; }
+
+    [InputControl(layout = "Button", displayName = "Head Right")]
+    public ButtonControl headRight { get; private set; }
 
     protected override void FinishSetup()
     {
@@ -257,8 +269,10 @@ public class CapturyInput : InputDevice
         // head controls
         headPosition = GetChildControl<Vector3Control>("headPosition");
         headRotation = GetChildControl<Vector3Control>("headRotation");
-        headNodding = GetChildControl<ButtonControl>("headNodding");
-        headShaking = GetChildControl<ButtonControl>("headShaking");
+        headUp = GetChildControl<ButtonControl>("headUp");
+        headDown = GetChildControl<ButtonControl>("headDown");
+        headLeft = GetChildControl<ButtonControl>("headLeft");
+        headRight = GetChildControl<ButtonControl>("headRight");
 
         Debug.Log("CapturyInput setup complete - Torso, Foot, Walk, Gait, Arm/Hand, and Head tracking controls ready");
     }

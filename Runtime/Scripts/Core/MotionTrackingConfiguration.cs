@@ -87,12 +87,10 @@ public class MotionTrackingConfiguration : ScriptableObject
     [Range(0.1f, 3.0f)]
     public float armsSensitivity = 1.0f;
     public bool armsDebugMode = false;
-
     [Space(5)]
     public bool isHandPositionTracked = true;
     [Tooltip("Use relative positions from calibration vs absolute world positions")]
     public bool useRelativeHandPosition = true;
-
     [Space(5)]
     public bool isHandRaiseTracked = true;
     [Tooltip("Height above shoulder required to trigger hand raised")]
@@ -100,40 +98,27 @@ public class MotionTrackingConfiguration : ScriptableObject
     [Tooltip("Minimum height gain from neutral position")]
     public float handRaiseMinHeight = 0.1f;
 
-
     [Header("Head Module")]
     public bool enableHeadModule = false;
     [Range(0.1f, 3.0f)]
     public float headSensitivity = 1.0f;
     public bool headDebugMode = false;
-
     [Space(5)]
     public bool isHeadPositionTracked = true;
     [Tooltip("Use relative positions from calibration vs absolute world positions")]
     public bool useRelativeHeadPosition = true;
-
     [Space(5)]
     public bool isHeadRotationTracked = true;
-
     [Space(5)]
-    public bool isNodDetectionEnabled = true;
-    [Tooltip("Degrees of pitch rotation required to trigger nod detection")]
-    public float nodThreshold = 15f;
-    [Tooltip("Time window for nod gesture completion")]
-    public float nodSpeed = 0.5f;
-
-    [Space(5)]
-    public bool isShakeDetectionEnabled = true;
-    [Tooltip("Degrees of yaw rotation required to trigger shake detection")]
-    public float shakeThreshold = 20f;
-    [Tooltip("Time window for shake gesture completion")]
-    public float shakeSpeed = 0.7f;
-
-    [Space(5)]
-    [Tooltip("Maximum time a gesture can be active before timing out")]
-    public float gestureTimeout = 2.0f;
-    [Tooltip("Degrees of movement from neutral required to end gesture")]
-    public float neutralReturnThreshold = 5f;
+    public bool isHeadDirectionEnabled = true;
+    [Tooltip("Degrees of upward tilt required to trigger head up detection")]
+    public float headUpThreshold = 15f;
+    [Tooltip("Degrees of downward tilt required to trigger head down detection")]
+    public float headDownThreshold = 15f;
+    [Tooltip("Degrees of leftward rotation required to trigger head left detection")]
+    public float headLeftThreshold = 20f;
+    [Tooltip("Degrees of rightward rotation required to trigger head right detection")]
+    public float headRightThreshold = 20f;
 
     [Header("Joint Names")]
     [Tooltip("Name of the pelvis/hips joint in your skeleton")]
@@ -142,6 +127,8 @@ public class MotionTrackingConfiguration : ScriptableObject
     public string spineJointName = "Spine4";
     [Tooltip("Name of the head joint")]
     public string headJointName = "Head";
+    [Tooltip("Name of the neck joint")]
+    public string neckJointName = "Neck";
     [Tooltip("Joint names for arm tracking")]
     public string leftShoulderJointName = "LeftShoulder";
     public string rightShoulderJointName = "RightShoulder";

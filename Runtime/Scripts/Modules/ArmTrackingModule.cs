@@ -13,6 +13,10 @@ public class ArmTrackingModule : MotionTrackingModule
     private Vector3 neutralLeftShoulderPosition = Vector3.zero;
     private Vector3 neutralRightShoulderPosition = Vector3.zero;
 
+    // neutral offsets between hand and shoulder
+    private Vector3 neutralLeftHandToShoulderOffset = Vector3.zero;
+    private Vector3 neutralRightHandToShoulderOffset = Vector3.zero;
+
     private Transform trackedLeftHand = null;
     private Transform trackedRightHand = null;
     private Transform trackedLeftShoulder = null;
@@ -61,11 +65,15 @@ public class ArmTrackingModule : MotionTrackingModule
             neutralLeftShoulderPosition = leftShoulder.position;
             neutralRightShoulderPosition = rightShoulder.position;
 
+            neutralLeftHandToShoulderOffset = neutralLeftHandPosition - neutralLeftShoulderPosition;
+            neutralRightHandToShoulderOffset = neutralRightHandPosition - neutralRightShoulderPosition;
+
             isCalibrated = true;
 
             Debug.Log("ArmsTrackingModule: Successfully calibrated! " +
                      $"Left Hand: {neutralLeftHandPosition:F3}, Right Hand: {neutralRightHandPosition:F3}, " +
-                     $"Left Shoulder: {neutralLeftShoulderPosition:F3}, Right Shoulder: {neutralRightShoulderPosition:F3}");
+                     $"Left Shoulder: {neutralLeftShoulderPosition:F3}, Right Shoulder: {neutralRightShoulderPosition:F3}, " +
+                     $"Left Offset: {neutralLeftHandToShoulderOffset:F3}, Right Offset: {neutralRightHandToShoulderOffset:F3}");
         }
         else
         {
@@ -185,9 +193,17 @@ public class ArmTrackingModule : MotionTrackingModule
         Vector3 currentLeftShoulderPosition = trackedLeftShoulder.position;
         Vector3 currentRightShoulderPosition = trackedRightShoulder.position;
 
+        // current hand-to-shoulder offsets
+        Vector3 currentLeftHandToShoulderOffset = currentLeftHandPosition - currentLeftShoulderPosition;
+        Vector3 currentRightHandToShoulderOffset = currentRightHandPosition - currentRightShoulderPosition;
+
+        // calculate relative movement (difference from neutral offset)
+        Vector3 leftRelativeMovement = currentLeftHandToShoulderOffset - neutralLeftHandToShoulderOffset;
+        Vector3 rightRelativeMovement = currentRightHandToShoulderOffset - neutralRightHandToShoulderOffset;
+
         // update hand positions
         if (IsHandPositionTracked)
-            UpdateHandPositions(ref state, currentLeftHandPosition, currentRightHandPosition);
+            UpdateHandPositions(ref state, leftRelativeMovement, rightRelativeMovement);
 
         // update hand raise detection
         if (IsHandRaiseTracked)
@@ -195,17 +211,19 @@ public class ArmTrackingModule : MotionTrackingModule
                           currentLeftShoulderPosition, currentRightShoulderPosition);
     }
 
-    private void UpdateHandPositions(ref CapturyInputState state, Vector3 leftHandPos, Vector3 rightHandPos)
+    private void UpdateHandPositions(ref CapturyInputState state, Vector3 leftRelativeMovement, Vector3 rightRelativeMovement)
     {
+
         if (UseRelativeHandPosition)
         {
-            state.leftHandPosition = (leftHandPos - neutralLeftHandPosition) * Sensitivity;
-            state.rightHandPosition = (rightHandPos - neutralRightHandPosition) * Sensitivity;
+            state.leftHandPosition = leftRelativeMovement * Sensitivity;
+            state.rightHandPosition = rightRelativeMovement * Sensitivity;
         }
         else
         {
-            state.leftHandPosition = leftHandPos * Sensitivity;
-            state.rightHandPosition = rightHandPos * Sensitivity;
+            // if not using relative, absolute hand positions
+            state.leftHandPosition = trackedLeftHand.position * Sensitivity;
+            state.rightHandPosition = trackedRightHand.position * Sensitivity;
         }
     }
 
@@ -291,6 +309,20 @@ public class ArmTrackingModule : MotionTrackingModule
 
     public Vector3 GetCurrentLeftHandPosition() => trackedLeftHand?.position ?? Vector3.zero;
     public Vector3 GetCurrentRightHandPosition() => trackedRightHand?.position ?? Vector3.zero;
+
+    public Vector3 GetLeftHandRelativeToShoulder()
+    {
+        if (trackedLeftHand == null || trackedLeftShoulder == null) return Vector3.zero;
+        Vector3 currentOffset = trackedLeftHand.position - trackedLeftShoulder.position;
+        return currentOffset - neutralLeftHandToShoulderOffset;
+    }
+
+    public Vector3 GetRightHandRelativeToShoulder()
+    {
+        if (trackedRightHand == null || trackedRightShoulder == null) return Vector3.zero;
+        Vector3 currentOffset = trackedRightHand.position - trackedRightShoulder.position;
+        return currentOffset - neutralRightHandToShoulderOffset;
+    }
 
     #endregion
 }

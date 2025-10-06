@@ -115,6 +115,33 @@ public struct CapturyInputState : IInputStateTypeInfo
 
     [InputControl(layout = "Button")]
     public float headRight;
+    // BALANCE TRACKING CONTROLS
+    [InputControl(layout = "Vector3")]
+    public Vector3 centerOfMassPosition;
+
+    [InputControl(layout = "Axis")]
+    public float lateralSway;
+
+    [InputControl(layout = "Axis")]
+    public float anteriorPosteriorSway;
+
+    [InputControl(layout = "Axis")]
+    public float swayMagnitude;
+
+    [InputControl(layout = "Button")]
+    public float isSwaying;
+
+    [InputControl(layout = "Axis")]
+    public float comVelocity;
+
+    [InputControl(layout = "Button")]
+    public float isBalanced;
+
+    [InputControl(layout = "Button")]
+    public float balanceLost;
+
+    [InputControl(layout = "Button")]
+    public float balanceRegained;
 }
 
 [InputControlLayout(stateType = typeof(CapturyInputState), displayName = "Captury Input")]
@@ -224,6 +251,33 @@ public class CapturyInput : InputDevice
 
     [InputControl(layout = "Button", displayName = "Head Right")]
     public ButtonControl headRight { get; private set; }
+    // BALANCE TRACKING CONTROLS
+    [InputControl(layout = "Vector3", displayName = "Center of Mass Position")]
+    public Vector3Control centerOfMassPosition { get; private set; }
+
+    [InputControl(layout = "Axis", displayName = "Lateral Sway")]
+    public AxisControl lateralSway { get; private set; }
+
+    [InputControl(layout = "Axis", displayName = "Anterior-Posterior Sway")]
+    public AxisControl anteriorPosteriorSway { get; private set; }
+
+    [InputControl(layout = "Axis", displayName = "Sway Magnitude")]
+    public AxisControl swayMagnitude { get; private set; }
+
+    [InputControl(layout = "Button", displayName = "Is Swaying")]
+    public ButtonControl isSwaying { get; private set; }
+
+    [InputControl(layout = "Axis", displayName = "CoM Velocity")]
+    public AxisControl comVelocity { get; private set; }
+
+    [InputControl(layout = "Button", displayName = "Is Balanced")]
+    public ButtonControl isBalanced { get; private set; }
+
+    [InputControl(layout = "Button", displayName = "Balance Lost")]
+    public ButtonControl balanceLost { get; private set; }
+
+    [InputControl(layout = "Button", displayName = "Balance Regained")]
+    public ButtonControl balanceRegained { get; private set; }
 
     protected override void FinishSetup()
     {
@@ -274,7 +328,18 @@ public class CapturyInput : InputDevice
         headLeft = GetChildControl<ButtonControl>("headLeft");
         headRight = GetChildControl<ButtonControl>("headRight");
 
-        Debug.Log("CapturyInput setup complete - Torso, Foot, Walk, Gait, Arm/Hand, and Head tracking controls ready");
+        // balance controls
+        centerOfMassPosition = GetChildControl<Vector3Control>("centerOfMassPosition");
+        lateralSway = GetChildControl<AxisControl>("lateralSway");
+        anteriorPosteriorSway = GetChildControl<AxisControl>("anteriorPosteriorSway");
+        swayMagnitude = GetChildControl<AxisControl>("swayMagnitude");
+        isSwaying = GetChildControl<ButtonControl>("isSwaying");
+        comVelocity = GetChildControl<AxisControl>("comVelocity");
+        isBalanced = GetChildControl<ButtonControl>("isBalanced");
+        balanceLost = GetChildControl<ButtonControl>("balanceLost");
+        balanceRegained = GetChildControl<ButtonControl>("balanceRegained");
+
+        Debug.Log("CapturyInput setup complete - Torso, Foot, Walk, Gait, Arm/Hand, Head, and Balance tracking controls ready");
     }
 
     public static void Register()

@@ -120,6 +120,26 @@ public class MotionTrackingConfiguration : ScriptableObject
     [Tooltip("Degrees of rightward rotation required to trigger head right detection")]
     public float headRightThreshold = 20f;
 
+    [Header("Balance Module")]
+    public bool enableBalanceModule = false;
+    [Range(0.1f, 3.0f)]
+    public float balanceSensitivity = 1.0f;
+    public bool balanceDebugMode = false;
+    [Space(5)]
+    public bool isCoMTracked = true;
+    [Tooltip("Track center of mass position")]
+    public bool isSwayTracked = true;
+    [Tooltip("Detect and measure body sway during balance")]
+    public bool isStabilityTracked = true;
+    [Tooltip("Track balance stability and detect balance loss/regain")]
+    [Space(5)]
+    [Tooltip("Sway magnitude threshold (meters) to trigger swaying detection")]
+    public float swayThreshold = 0.1f;
+    [Tooltip("CoM velocity threshold (m/s) - below this is considered stable")]
+    public float stabilityThreshold = 0.05f;
+    [Tooltip("Frames of CoM history to keep (180 = ~3 seconds at 60fps)")]
+    public int comHistoryFrames = 180;
+
     [Header("Joint Names")]
     [Tooltip("Name of the pelvis/hips joint in your skeleton")]
     public string pelvisJointName = "Hips";
@@ -135,9 +155,18 @@ public class MotionTrackingConfiguration : ScriptableObject
     [Tooltip("Joint names for foot tracking")]
     public string leftFootJointName = "LeftFoot";
     public string rightFootJointName = "RightFoot";
+    // Add this in the Joint Names section:
+    [Tooltip("Spine joint for walk speed tracking (FootModule uses this, separate from TorsoModule)")]
+    public string walkTrackingSpineJointName = "Spine";
     [Tooltip("Joint names for hand tracking")]
     public string leftHandJointName = "LeftHand";
     public string rightHandJointName = "RightHand";
+    [Tooltip("Joint names for balance tracking (center of mass calculation)")]
+    public string trunkJointName = "Spine1";
+    public string leftForeArmJointName = "LeftForeArm";
+    public string rightForeArmJointName = "RightForeArm";
+    public string leftLegJointName = "LeftLeg";
+    public string rightLegJointName = "RightLeg";
 
     private void OnValidate()
     {

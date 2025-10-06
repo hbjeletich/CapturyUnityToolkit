@@ -46,6 +46,9 @@ public class FootTrackingModule : MotionTrackingModule
     private Transform trackedLeftFoot = null;
     private Transform trackedRightFoot = null;
 
+    // walk tracking - using spine instead of pelvis to avoid conflict with TorsoModule
+    private Transform trackedSpineForWalk = null;
+
     // walk tracking
     private WalkState currentWalkState = WalkState.Idle;
     private WalkState previousWalkState = WalkState.Idle;
@@ -53,7 +56,7 @@ public class FootTrackingModule : MotionTrackingModule
     private float currentWalkSpeed = 0f;
 
     // data buffers
-    private Queue<Vector3> pelvisPositionHistory;
+    private Queue<Vector3> spinePositionHistory;
     private Queue<float> timestampHistory;
     private Queue<FootEvent> footEventHistory;
 
@@ -106,7 +109,7 @@ public class FootTrackingModule : MotionTrackingModule
         base.Initialize(manager);
 
         // initialize simplified data structures
-        pelvisPositionHistory = new Queue<Vector3>();
+        spinePositionHistory = new Queue<Vector3>();
         timestampHistory = new Queue<float>();
         footEventHistory = new Queue<FootEvent>();
         recentStepTimes = new List<float>();
@@ -136,6 +139,16 @@ public class FootTrackingModule : MotionTrackingModule
             defaultFootDistance = Vector2.Distance(leftPos2D, rightPos2D);
             groundHeight = (leftPos.y + rightPos.y) / 2.0f;
 
+            // get spine for walk tracking if enabled
+            if (IsWalkTrackingEnabled || IsGaitAnalysisEnabled)
+            {
+                trackedSpineForWalk = GetSpineForWalkJoint(joints);
+                if (trackedSpineForWalk == null)
+                {
+                    Debug.LogWarning("FootTrackingModule: Could not find Spine joint for walk tracking! Walk detection may not work correctly.");
+                }
+            }
+
             ClearHistoryBuffers();
 
             isCalibrated = true;
@@ -150,11 +163,29 @@ public class FootTrackingModule : MotionTrackingModule
 
     public override bool HasRequiredJoints(Transform[] joints)
     {
-        return GetLeftFootJoint(joints) != null && GetRightFootJoint(joints) != null;
+        bool hasFeet = GetLeftFootJoint(joints) != null && GetRightFootJoint(joints) != null;
+        
+        // if walk tracking is enabled, also need spine
+        if (IsWalkTrackingEnabled || IsGaitAnalysisEnabled)
+        {
+            bool hasSpine = GetSpineForWalkJoint(joints) != null;
+            return hasFeet && hasSpine;
+        }
+        
+        return hasFeet;
     }
 
     public override string[] GetRequiredJointNames()
     {
+        if (IsWalkTrackingEnabled || IsGaitAnalysisEnabled)
+        {
+            return new string[] {
+                manager?.Config?.leftFootJointName ?? "LeftFoot",
+                manager?.Config?.rightFootJointName ?? "RightFoot",
+                manager?.Config?.walkTrackingSpineJointName ?? "Spine"
+            };
+        }
+        
         return new string[] {
             manager?.Config?.leftFootJointName ?? "LeftFoot",
             manager?.Config?.rightFootJointName ?? "RightFoot"
@@ -171,6 +202,22 @@ public class FootTrackingModule : MotionTrackingModule
     {
         string rightFootName = manager?.Config?.rightFootJointName ?? "RightFoot";
         return manager?.GetJointByName(rightFootName);
+    }
+
+    private Transform GetSpineForWalkJoint(Transform[] joints)
+    {
+        string spineName = manager?.Config?.walkTrackingSpineJointName ?? "Spine";
+        Transform spine = manager?.GetJointByName(spineName);
+        
+        if (DebugMode)
+        {
+            if (spine == null)
+                Debug.LogWarning($"FootTrackingModule: Could not find spine joint '{spineName}' for walk tracking");
+            else
+                Debug.Log($"FootTrackingModule: Found spine joint '{spineName}' for walk tracking at {spine.position}");
+        }
+        
+        return spine;
     }
 
     #endregion
@@ -190,7 +237,7 @@ public class FootTrackingModule : MotionTrackingModule
         float leftHeight = leftPos.y - groundHeight;
         float rightHeight = rightPos.y - groundHeight;
 
-        // update simplified data buffers
+        // update data buffers
         if (IsWalkTrackingEnabled || IsGaitAnalysisEnabled)
         {
             UpdateDataBuffers();
@@ -315,17 +362,17 @@ public class FootTrackingModule : MotionTrackingModule
         float currentTime = Time.time;
         timestampHistory.Enqueue(currentTime);
 
-        // get pelvis for walk speed calculation
-        Transform pelvis = manager?.GetJointByName(manager.Config.pelvisJointName ?? "Hips");
-        if (pelvis != null)
+        // get spine for walk speed calculation
+        // NOTE: now using Spine instead of Pelvis to avoid conflict with TorsoModule
+        if (trackedSpineForWalk != null)
         {
-            pelvisPositionHistory.Enqueue(pelvis.position);
+            spinePositionHistory.Enqueue(trackedSpineForWalk.position);
         }
 
         // maintain buffer size
-        while (pelvisPositionHistory.Count > PositionHistoryFrames)
+        while (spinePositionHistory.Count > PositionHistoryFrames)
         {
-            pelvisPositionHistory.Dequeue();
+            spinePositionHistory.Dequeue();
             timestampHistory.Dequeue();
         }
     }
@@ -388,17 +435,15 @@ public class FootTrackingModule : MotionTrackingModule
 
     private float CalculateCurrentSpeed()
     {
-        if (pelvisPositionHistory.Count < 30) return 0f;
+        if (spinePositionHistory.Count < 30) return 0f;
 
-        Vector3[] recentPositions = pelvisPositionHistory.TakeLast(30).ToArray();
+        Vector3[] recentPositions = spinePositionHistory.TakeLast(30).ToArray();
         if (recentPositions.Length < 2) return 0f;
 
         Vector3 movement = recentPositions[recentPositions.Length - 1] - recentPositions[0];
         float timeSpan = 0.5f; // 30 frames at 60fps
 
-        //if (DebugMode) Debug.Log($"Current Walking Speed: {movement.magnitude * 100 / timeSpan}");
-
-        return movement.magnitude * 100 / timeSpan;
+        return movement.magnitude / timeSpan;
     }
 
     #endregion
@@ -408,7 +453,7 @@ public class FootTrackingModule : MotionTrackingModule
     {
         float currentTime = Time.time;
 
-        // simplified foot contact detection
+        // foot contact detection
         bool leftContactNow = leftHeight < (MinLiftHeight * 0.5f);
         bool rightContactNow = rightHeight < (MinLiftHeight * 0.5f);
 
@@ -538,7 +583,7 @@ public class FootTrackingModule : MotionTrackingModule
 
     private void ClearHistoryBuffers()
     {
-        pelvisPositionHistory?.Clear();
+        spinePositionHistory?.Clear();
         timestampHistory?.Clear();
         footEventHistory?.Clear();
         recentStepTimes?.Clear();

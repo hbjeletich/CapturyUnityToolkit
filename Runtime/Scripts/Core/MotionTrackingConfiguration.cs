@@ -133,7 +133,6 @@ public class MotionTrackingConfiguration : ScriptableObject
     public bool isStabilityTracked = true;
     [Tooltip("Track balance stability and detect balance loss/regain")]
     [Space(5)]
-    [Tooltip("Sway magnitude threshold (meters) to trigger swaying detection")]
     public float swayThreshold = 0.1f;
     [Tooltip("CoM velocity threshold (m/s) - below this is considered stable")]
     public float stabilityThreshold = 0.05f;

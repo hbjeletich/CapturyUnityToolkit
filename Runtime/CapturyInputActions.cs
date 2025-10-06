@@ -674,6 +674,194 @@ public partial class @CapturyInputActions: IInputActionCollection2, IDisposable
                     ""isPartOfComposite"": false
                 }
             ]
+        },
+        {
+            ""name"": ""Balance"",
+            ""id"": ""f636973a-8868-4b92-b739-ea877d45de34"",
+            ""actions"": [
+                {
+                    ""name"": ""CenterOfMassPosition"",
+                    ""type"": ""Value"",
+                    ""id"": ""ef91cdff-b92a-4950-a95c-faf609950861"",
+                    ""expectedControlType"": ""Vector3"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""LateralSway"",
+                    ""type"": ""Value"",
+                    ""id"": ""af5c68cd-b1c4-41df-804b-40f635f0743e"",
+                    ""expectedControlType"": ""Axis"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""AnteriorPosteriorSway"",
+                    ""type"": ""Value"",
+                    ""id"": ""14171d43-c24c-4253-ae85-56fdc2cfaa4d"",
+                    ""expectedControlType"": ""Axis"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""SwayMagnitude"",
+                    ""type"": ""Value"",
+                    ""id"": ""e42c38f1-5d91-411c-bdec-cb56e8037844"",
+                    ""expectedControlType"": ""Axis"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""IsSwaying"",
+                    ""type"": ""Button"",
+                    ""id"": ""0517f152-21cd-4ef7-ba8b-05e1463947c9"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""CoMVelocity"",
+                    ""type"": ""Value"",
+                    ""id"": ""c7b03844-879f-4aa7-932a-3dfd57e42690"",
+                    ""expectedControlType"": ""Axis"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""IsBalanced"",
+                    ""type"": ""Button"",
+                    ""id"": ""dcd110e0-d5e4-4f85-bc41-d6c7831a3401"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""BalanceLost"",
+                    ""type"": ""Button"",
+                    ""id"": ""ba07cd99-5c60-40fb-8f97-6d3637e2aa30"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""BalanceRegained"",
+                    ""type"": ""Button"",
+                    ""id"": ""8b749e19-1c00-4ea2-a404-97b6307b6b84"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                }
+            ],
+            ""bindings"": [
+                {
+                    ""name"": """",
+                    ""id"": ""7b705a51-c80c-4726-9281-852b23589067"",
+                    ""path"": ""<CapturyInput>/centerOfMassPosition"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""CenterOfMassPosition"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""162f1605-2772-4b33-bf3c-35f9570e2e0b"",
+                    ""path"": ""<CapturyInput>/lateralSway"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""LateralSway"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""ec189255-9dda-4e55-9420-45647193c439"",
+                    ""path"": ""<CapturyInput>/anteriorPosteriorSway"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""AnteriorPosteriorSway"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""de7e8f72-dabe-4609-a4ef-75d439d1fa90"",
+                    ""path"": ""<CapturyInput>/swayMagnitude"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""SwayMagnitude"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""208d3842-e9ac-40f7-b580-7a8d89c03e0b"",
+                    ""path"": ""<CapturyInput>/isSwaying"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""IsSwaying"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""32f1e3ca-92f1-4cc4-b297-bdb278457690"",
+                    ""path"": ""<CapturyInput>/comVelocity"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""CoMVelocity"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""a44e74ba-d98f-4ea7-9692-03de75c3e288"",
+                    ""path"": ""<CapturyInput>/isBalanced"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""IsBalanced"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""4a2f7b47-fd2e-44fa-aead-4d4dd751cdbb"",
+                    ""path"": ""<CapturyInput>/balanceLost"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""BalanceLost"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""1b432141-c886-4388-a3d6-f34e606a454b"",
+                    ""path"": ""<CapturyInput>/balanceRegained"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""BalanceRegained"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                }
+            ]
         }
     ],
     ""controlSchemes"": []
@@ -717,6 +905,17 @@ public partial class @CapturyInputActions: IInputActionCollection2, IDisposable
         m_Head_HeadRotation = m_Head.FindAction("HeadRotation", throwIfNotFound: true);
         m_Head_HeadNodding = m_Head.FindAction("HeadNodding", throwIfNotFound: true);
         m_Head_HeadShaking = m_Head.FindAction("HeadShaking", throwIfNotFound: true);
+        // Balance
+        m_Balance = asset.FindActionMap("Balance", throwIfNotFound: true);
+        m_Balance_CenterOfMassPosition = m_Balance.FindAction("CenterOfMassPosition", throwIfNotFound: true);
+        m_Balance_LateralSway = m_Balance.FindAction("LateralSway", throwIfNotFound: true);
+        m_Balance_AnteriorPosteriorSway = m_Balance.FindAction("AnteriorPosteriorSway", throwIfNotFound: true);
+        m_Balance_SwayMagnitude = m_Balance.FindAction("SwayMagnitude", throwIfNotFound: true);
+        m_Balance_IsSwaying = m_Balance.FindAction("IsSwaying", throwIfNotFound: true);
+        m_Balance_CoMVelocity = m_Balance.FindAction("CoMVelocity", throwIfNotFound: true);
+        m_Balance_IsBalanced = m_Balance.FindAction("IsBalanced", throwIfNotFound: true);
+        m_Balance_BalanceLost = m_Balance.FindAction("BalanceLost", throwIfNotFound: true);
+        m_Balance_BalanceRegained = m_Balance.FindAction("BalanceRegained", throwIfNotFound: true);
     }
 
     public void Dispose()
@@ -1174,6 +1373,116 @@ public partial class @CapturyInputActions: IInputActionCollection2, IDisposable
         }
     }
     public HeadActions @Head => new HeadActions(this);
+
+    // Balance
+    private readonly InputActionMap m_Balance;
+    private List<IBalanceActions> m_BalanceActionsCallbackInterfaces = new List<IBalanceActions>();
+    private readonly InputAction m_Balance_CenterOfMassPosition;
+    private readonly InputAction m_Balance_LateralSway;
+    private readonly InputAction m_Balance_AnteriorPosteriorSway;
+    private readonly InputAction m_Balance_SwayMagnitude;
+    private readonly InputAction m_Balance_IsSwaying;
+    private readonly InputAction m_Balance_CoMVelocity;
+    private readonly InputAction m_Balance_IsBalanced;
+    private readonly InputAction m_Balance_BalanceLost;
+    private readonly InputAction m_Balance_BalanceRegained;
+    public struct BalanceActions
+    {
+        private @CapturyInputActions m_Wrapper;
+        public BalanceActions(@CapturyInputActions wrapper) { m_Wrapper = wrapper; }
+        public InputAction @CenterOfMassPosition => m_Wrapper.m_Balance_CenterOfMassPosition;
+        public InputAction @LateralSway => m_Wrapper.m_Balance_LateralSway;
+        public InputAction @AnteriorPosteriorSway => m_Wrapper.m_Balance_AnteriorPosteriorSway;
+        public InputAction @SwayMagnitude => m_Wrapper.m_Balance_SwayMagnitude;
+        public InputAction @IsSwaying => m_Wrapper.m_Balance_IsSwaying;
+        public InputAction @CoMVelocity => m_Wrapper.m_Balance_CoMVelocity;
+        public InputAction @IsBalanced => m_Wrapper.m_Balance_IsBalanced;
+        public InputAction @BalanceLost => m_Wrapper.m_Balance_BalanceLost;
+        public InputAction @BalanceRegained => m_Wrapper.m_Balance_BalanceRegained;
+        public InputActionMap Get() { return m_Wrapper.m_Balance; }
+        public void Enable() { Get().Enable(); }
+        public void Disable() { Get().Disable(); }
+        public bool enabled => Get().enabled;
+        public static implicit operator InputActionMap(BalanceActions set) { return set.Get(); }
+        public void AddCallbacks(IBalanceActions instance)
+        {
+            if (instance == null || m_Wrapper.m_BalanceActionsCallbackInterfaces.Contains(instance)) return;
+            m_Wrapper.m_BalanceActionsCallbackInterfaces.Add(instance);
+            @CenterOfMassPosition.started += instance.OnCenterOfMassPosition;
+            @CenterOfMassPosition.performed += instance.OnCenterOfMassPosition;
+            @CenterOfMassPosition.canceled += instance.OnCenterOfMassPosition;
+            @LateralSway.started += instance.OnLateralSway;
+            @LateralSway.performed += instance.OnLateralSway;
+            @LateralSway.canceled += instance.OnLateralSway;
+            @AnteriorPosteriorSway.started += instance.OnAnteriorPosteriorSway;
+            @AnteriorPosteriorSway.performed += instance.OnAnteriorPosteriorSway;
+            @AnteriorPosteriorSway.canceled += instance.OnAnteriorPosteriorSway;
+            @SwayMagnitude.started += instance.OnSwayMagnitude;
+            @SwayMagnitude.performed += instance.OnSwayMagnitude;
+            @SwayMagnitude.canceled += instance.OnSwayMagnitude;
+            @IsSwaying.started += instance.OnIsSwaying;
+            @IsSwaying.performed += instance.OnIsSwaying;
+            @IsSwaying.canceled += instance.OnIsSwaying;
+            @CoMVelocity.started += instance.OnCoMVelocity;
+            @CoMVelocity.performed += instance.OnCoMVelocity;
+            @CoMVelocity.canceled += instance.OnCoMVelocity;
+            @IsBalanced.started += instance.OnIsBalanced;
+            @IsBalanced.performed += instance.OnIsBalanced;
+            @IsBalanced.canceled += instance.OnIsBalanced;
+            @BalanceLost.started += instance.OnBalanceLost;
+            @BalanceLost.performed += instance.OnBalanceLost;
+            @BalanceLost.canceled += instance.OnBalanceLost;
+            @BalanceRegained.started += instance.OnBalanceRegained;
+            @BalanceRegained.performed += instance.OnBalanceRegained;
+            @BalanceRegained.canceled += instance.OnBalanceRegained;
+        }
+
+        private void UnregisterCallbacks(IBalanceActions instance)
+        {
+            @CenterOfMassPosition.started -= instance.OnCenterOfMassPosition;
+            @CenterOfMassPosition.performed -= instance.OnCenterOfMassPosition;
+            @CenterOfMassPosition.canceled -= instance.OnCenterOfMassPosition;
+            @LateralSway.started -= instance.OnLateralSway;
+            @LateralSway.performed -= instance.OnLateralSway;
+            @LateralSway.canceled -= instance.OnLateralSway;
+            @AnteriorPosteriorSway.started -= instance.OnAnteriorPosteriorSway;
+            @AnteriorPosteriorSway.performed -= instance.OnAnteriorPosteriorSway;
+            @AnteriorPosteriorSway.canceled -= instance.OnAnteriorPosteriorSway;
+            @SwayMagnitude.started -= instance.OnSwayMagnitude;
+            @SwayMagnitude.performed -= instance.OnSwayMagnitude;
+            @SwayMagnitude.canceled -= instance.OnSwayMagnitude;
+            @IsSwaying.started -= instance.OnIsSwaying;
+            @IsSwaying.performed -= instance.OnIsSwaying;
+            @IsSwaying.canceled -= instance.OnIsSwaying;
+            @CoMVelocity.started -= instance.OnCoMVelocity;
+            @CoMVelocity.performed -= instance.OnCoMVelocity;
+            @CoMVelocity.canceled -= instance.OnCoMVelocity;
+            @IsBalanced.started -= instance.OnIsBalanced;
+            @IsBalanced.performed -= instance.OnIsBalanced;
+            @IsBalanced.canceled -= instance.OnIsBalanced;
+            @BalanceLost.started -= instance.OnBalanceLost;
+            @BalanceLost.performed -= instance.OnBalanceLost;
+            @BalanceLost.canceled -= instance.OnBalanceLost;
+            @BalanceRegained.started -= instance.OnBalanceRegained;
+            @BalanceRegained.performed -= instance.OnBalanceRegained;
+            @BalanceRegained.canceled -= instance.OnBalanceRegained;
+        }
+
+        public void RemoveCallbacks(IBalanceActions instance)
+        {
+            if (m_Wrapper.m_BalanceActionsCallbackInterfaces.Remove(instance))
+                UnregisterCallbacks(instance);
+        }
+
+        public void SetCallbacks(IBalanceActions instance)
+        {
+            foreach (var item in m_Wrapper.m_BalanceActionsCallbackInterfaces)
+                UnregisterCallbacks(item);
+            m_Wrapper.m_BalanceActionsCallbackInterfaces.Clear();
+            AddCallbacks(instance);
+        }
+    }
+    public BalanceActions @Balance => new BalanceActions(this);
     public interface ITorsoActions
     {
         void OnIsBentOver(InputAction.CallbackContext context);
@@ -1216,5 +1525,17 @@ public partial class @CapturyInputActions: IInputActionCollection2, IDisposable
         void OnHeadRotation(InputAction.CallbackContext context);
         void OnHeadNodding(InputAction.CallbackContext context);
         void OnHeadShaking(InputAction.CallbackContext context);
+    }
+    public interface IBalanceActions
+    {
+        void OnCenterOfMassPosition(InputAction.CallbackContext context);
+        void OnLateralSway(InputAction.CallbackContext context);
+        void OnAnteriorPosteriorSway(InputAction.CallbackContext context);
+        void OnSwayMagnitude(InputAction.CallbackContext context);
+        void OnIsSwaying(InputAction.CallbackContext context);
+        void OnCoMVelocity(InputAction.CallbackContext context);
+        void OnIsBalanced(InputAction.CallbackContext context);
+        void OnBalanceLost(InputAction.CallbackContext context);
+        void OnBalanceRegained(InputAction.CallbackContext context);
     }
 }

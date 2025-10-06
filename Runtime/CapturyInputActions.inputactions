@@ -652,6 +652,194 @@
                     "isPartOfComposite": false
                 }
             ]
+        },
+        {
+            "name": "Balance",
+            "id": "f636973a-8868-4b92-b739-ea877d45de34",
+            "actions": [
+                {
+                    "name": "CenterOfMassPosition",
+                    "type": "Value",
+                    "id": "ef91cdff-b92a-4950-a95c-faf609950861",
+                    "expectedControlType": "Vector3",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "LateralSway",
+                    "type": "Value",
+                    "id": "af5c68cd-b1c4-41df-804b-40f635f0743e",
+                    "expectedControlType": "Axis",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "AnteriorPosteriorSway",
+                    "type": "Value",
+                    "id": "14171d43-c24c-4253-ae85-56fdc2cfaa4d",
+                    "expectedControlType": "Axis",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "SwayMagnitude",
+                    "type": "Value",
+                    "id": "e42c38f1-5d91-411c-bdec-cb56e8037844",
+                    "expectedControlType": "Axis",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "IsSwaying",
+                    "type": "Button",
+                    "id": "0517f152-21cd-4ef7-ba8b-05e1463947c9",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "CoMVelocity",
+                    "type": "Value",
+                    "id": "c7b03844-879f-4aa7-932a-3dfd57e42690",
+                    "expectedControlType": "Axis",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "IsBalanced",
+                    "type": "Button",
+                    "id": "dcd110e0-d5e4-4f85-bc41-d6c7831a3401",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "BalanceLost",
+                    "type": "Button",
+                    "id": "ba07cd99-5c60-40fb-8f97-6d3637e2aa30",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "BalanceRegained",
+                    "type": "Button",
+                    "id": "8b749e19-1c00-4ea2-a404-97b6307b6b84",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "7b705a51-c80c-4726-9281-852b23589067",
+                    "path": "<CapturyInput>/centerOfMassPosition",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "CenterOfMassPosition",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "162f1605-2772-4b33-bf3c-35f9570e2e0b",
+                    "path": "<CapturyInput>/lateralSway",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "LateralSway",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "ec189255-9dda-4e55-9420-45647193c439",
+                    "path": "<CapturyInput>/anteriorPosteriorSway",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "AnteriorPosteriorSway",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "de7e8f72-dabe-4609-a4ef-75d439d1fa90",
+                    "path": "<CapturyInput>/swayMagnitude",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "SwayMagnitude",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "208d3842-e9ac-40f7-b580-7a8d89c03e0b",
+                    "path": "<CapturyInput>/isSwaying",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "IsSwaying",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "32f1e3ca-92f1-4cc4-b297-bdb278457690",
+                    "path": "<CapturyInput>/comVelocity",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "CoMVelocity",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "a44e74ba-d98f-4ea7-9692-03de75c3e288",
+                    "path": "<CapturyInput>/isBalanced",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "IsBalanced",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "4a2f7b47-fd2e-44fa-aead-4d4dd751cdbb",
+                    "path": "<CapturyInput>/balanceLost",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "BalanceLost",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "1b432141-c886-4388-a3d6-f34e606a454b",
+                    "path": "<CapturyInput>/balanceRegained",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "BalanceRegained",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
         }
     ],
     "controlSchemes": []

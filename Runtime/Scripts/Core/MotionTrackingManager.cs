@@ -22,6 +22,7 @@ public class MotionTrackingManager : MonoBehaviour
     private FootTrackingModule footModule;
     private ArmTrackingModule armsModule;
     private HeadTrackingModule headModule;
+    private BalanceTrackingModule balanceModule;
     private List<MotionTrackingModule> allModules;
 
     // state
@@ -166,6 +167,14 @@ public class MotionTrackingManager : MonoBehaviour
             headObj.transform.SetParent(transform);
             headModule = headObj.AddComponent<HeadTrackingModule>();
             allModules.Add(headModule);
+        }
+
+        if (config.enableBalanceModule)
+        {
+            GameObject balanceObj = new GameObject("BalanceTrackingModule");
+            balanceObj.transform.SetParent(transform);
+            balanceModule = balanceObj.AddComponent<BalanceTrackingModule>();
+            allModules.Add(balanceModule);
         }
 
         foreach (var module in allModules)
@@ -327,12 +336,14 @@ public class MotionTrackingManager : MonoBehaviour
     public FootTrackingModule GetFootModule() => footModule;
     public ArmTrackingModule GetArmsModule() => armsModule;
     public HeadTrackingModule GetHeadModule() => headModule;
+    public BalanceTrackingModule GetBalanceModule() => balanceModule;
 
     // quick access to module states
     public bool IsTorsoModuleEnabled => config.enableTorsoModule && torsoModule?.IsCalibrated == true;
     public bool IsFootModuleEnabled => config.enableFootModule && footModule?.IsCalibrated == true;
     public bool IsArmsModuleEnabled => config.enableArmsModule && armsModule?.IsCalibrated == true;
     public bool IsHeadModuleEnabled => config.enableHeadModule && headModule?.IsCalibrated == true;
+    public bool IsBalanceModuleEnabled => config.enableBalanceModule && balanceModule?.IsCalibrated == true;
 
 
     #endregion

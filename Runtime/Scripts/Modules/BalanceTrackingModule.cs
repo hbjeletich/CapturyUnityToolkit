@@ -18,8 +18,8 @@ public class BalanceTrackingModule : MotionTrackingModule
     private Transform trackedRightForeArm = null;
     private Transform trackedLeftLeg = null;
     private Transform trackedRightLeg = null;
-    
-    // TOE BASE TRACKING FOR BASE OF SUPPORT - NEW!
+
+    // TOE BASE TRACKING FOR BASE OF SUPPORT
     private Transform trackedLeftToeBase = null;
     private Transform trackedRightToeBase = null;
 
@@ -32,7 +32,7 @@ public class BalanceTrackingModule : MotionTrackingModule
     private Vector3 previousCoM = Vector3.zero;
     private float comVelocity = 0f;
 
-    // BASE OF SUPPORT TRACKING - NEW!
+    // BASE OF SUPPORT TRACKING
     private Vector2 baseOfSupportCenter = Vector2.zero;
     private float baseOfSupportWidth = 0f;
     private float comToBaseOfSupportDistance = 0f;
@@ -73,7 +73,7 @@ public class BalanceTrackingModule : MotionTrackingModule
     public override void Calibrate(Transform[] joints)
     {
         Debug.Log("BalanceTrackingModule: Calibrate() called");
-        
+
         Transform trunk = GetTrunkJoint(joints);
         Transform leftForeArm = GetLeftForeArmJoint(joints);
         Transform rightForeArm = GetRightForeArmJoint(joints);
@@ -82,7 +82,7 @@ public class BalanceTrackingModule : MotionTrackingModule
         Transform leftToeBase = GetLeftToeBaseJoint(joints);
         Transform rightToeBase = GetRightToeBaseJoint(joints);
 
-        if (trunk != null && leftForeArm != null && rightForeArm != null && 
+        if (trunk != null && leftForeArm != null && rightForeArm != null &&
             leftLeg != null && rightLeg != null && leftToeBase != null && rightToeBase != null)
         {
             trackedTrunk = trunk;
@@ -125,13 +125,13 @@ public class BalanceTrackingModule : MotionTrackingModule
 
     public override bool HasRequiredJoints(Transform[] joints)
     {
-        return GetTrunkJoint(joints) != null && 
-               GetLeftForeArmJoint(joints) != null && 
+        return GetTrunkJoint(joints) != null &&
+               GetLeftForeArmJoint(joints) != null &&
                GetRightForeArmJoint(joints) != null &&
-               GetLeftLegJoint(joints) != null && 
+               GetLeftLegJoint(joints) != null &&
                GetRightLegJoint(joints) != null &&
-               GetLeftFootJoint(joints) != null &&
-               GetRightFootJoint(joints) != null;
+               GetLeftToeBaseJoint(joints) != null &&
+               GetRightToeBaseJoint(joints) != null;
     }
 
     public override string[] GetRequiredJointNames()
@@ -142,15 +142,25 @@ public class BalanceTrackingModule : MotionTrackingModule
             manager?.Config?.rightForeArmJointName ?? "RightForeArm",
             manager?.Config?.leftLegJointName ?? "LeftLeg",
             manager?.Config?.rightLegJointName ?? "RightLeg",
-            manager?.Config?.leftFootJointName ?? "LeftFoot",
-            manager?.Config?.rightFootJointName ?? "RightFoot"
+            manager?.Config?.leftToeBaseJointName ?? "LeftToeBase",
+            manager?.Config?.rightToeBaseJointName ?? "RightToeBase"
         };
     }
 
     private Transform GetTrunkJoint(Transform[] joints)
     {
         string trunkName = manager?.Config?.trunkJointName ?? "Spine1";
-        return manager?.GetJointByName(trunkName);
+        Transform trunk = manager?.GetJointByName(trunkName);
+
+        if (DebugMode)
+        {
+            if (trunk == null)
+                Debug.LogWarning($"BalanceTrackingModule: Could not find trunk joint '{trunkName}'");
+            else
+                Debug.Log($"BalanceTrackingModule: Found trunk joint '{trunkName}' at {trunk.position}");
+        }
+
+        return trunk;
     }
 
     private Transform GetLeftForeArmJoint(Transform[] joints)
@@ -177,16 +187,16 @@ public class BalanceTrackingModule : MotionTrackingModule
         return manager?.GetJointByName(rightLegName);
     }
 
-    private Transform GetLeftFootJoint(Transform[] joints)
+    private Transform GetLeftToeBaseJoint(Transform[] joints)
     {
-        string leftFootName = manager?.Config?.leftFootJointName ?? "LeftFoot";
-        return manager?.GetJointByName(leftFootName);
+        string leftToeBaseName = manager?.Config?.leftToeBaseJointName ?? "LeftToeBase";
+        return manager?.GetJointByName(leftToeBaseName);
     }
 
-    private Transform GetRightFootJoint(Transform[] joints)
+    private Transform GetRightToeBaseJoint(Transform[] joints)
     {
-        string rightFootName = manager?.Config?.rightFootJointName ?? "RightFoot";
-        return manager?.GetJointByName(rightFootName);
+        string rightToeBaseName = manager?.Config?.rightToeBaseJointName ?? "RightToeBase";
+        return manager?.GetJointByName(rightToeBaseName);
     }
 
     #endregion
@@ -205,8 +215,8 @@ public class BalanceTrackingModule : MotionTrackingModule
         }
 
         if (trackedTrunk == null || trackedLeftForeArm == null || trackedRightForeArm == null ||
-            trackedLeftLeg == null || trackedRightLeg == null || 
-            trackedLeftFoot == null || trackedRightFoot == null)
+            trackedLeftLeg == null || trackedRightLeg == null ||
+            trackedLeftToeBase == null || trackedRightToeBase == null)
         {
             if (DebugMode && Time.frameCount % 300 == 0)
                 Debug.Log("BalanceTrackingModule: Missing tracked joints");
@@ -217,7 +227,7 @@ public class BalanceTrackingModule : MotionTrackingModule
         previousCoM = currentCoM;
         currentCoM = CalculateCenterOfMass();
 
-        // update base of support from current foot positions
+        // update base of support from current toe positions
         UpdateBaseOfSupport();
 
         // update data buffers
@@ -253,15 +263,15 @@ public class BalanceTrackingModule : MotionTrackingModule
 
     private void UpdateBaseOfSupport()
     {
-        // get foot positions projected onto ground plane (XZ)
-        Vector2 leftFootPos2D = new Vector2(trackedLeftFoot.position.x, trackedLeftFoot.position.z);
-        Vector2 rightFootPos2D = new Vector2(trackedRightFoot.position.x, trackedRightFoot.position.z);
+        // get toe base positions projected onto ground plane (XZ)
+        Vector2 leftToePos2D = new Vector2(trackedLeftToeBase.position.x, trackedLeftToeBase.position.z);
+        Vector2 rightToePos2D = new Vector2(trackedRightToeBase.position.x, trackedRightToeBase.position.z);
 
-        // center of base of support is midpoint between feet
-        baseOfSupportCenter = (leftFootPos2D + rightFootPos2D) / 2f;
+        // center of base of support is midpoint between toes
+        baseOfSupportCenter = (leftToePos2D + rightToePos2D) / 2f;
 
         // width of base of support
-        baseOfSupportWidth = Vector2.Distance(leftFootPos2D, rightFootPos2D);
+        baseOfSupportWidth = Vector2.Distance(leftToePos2D, rightToePos2D);
 
         // calculate CoM projection onto ground plane
         Vector2 comProjection = new Vector2(currentCoM.x, currentCoM.z);
@@ -287,7 +297,7 @@ public class BalanceTrackingModule : MotionTrackingModule
         // instead of comparing to neutral, compare to base of support center
         Vector2 comProjection = new Vector2(currentCoM.x, currentCoM.z);
         Vector2 comRelativeToBase = comProjection - baseOfSupportCenter;
-        
+
         // convert back to 3D (keep Y component relative to neutral)
         Vector3 comRelativeToSupport = new Vector3(
             comRelativeToBase.x,
@@ -308,7 +318,7 @@ public class BalanceTrackingModule : MotionTrackingModule
         // calculate sway relative to base of support center instead of neutral position
         Vector2 comProjection = new Vector2(currentCoM.x, currentCoM.z);
         Vector2 swayVector = comProjection - baseOfSupportCenter;
-        
+
         // separate lateral (X) and anterior-posterior (Z) sway
         float lateralSway = swayVector.x;
         float apSway = swayVector.y;
@@ -322,7 +332,7 @@ public class BalanceTrackingModule : MotionTrackingModule
 
         // normalize sway by base of support width for better threshold
         float normalizedSway = baseOfSupportWidth > 0 ? swayMagnitude / (baseOfSupportWidth * 0.5f) : 0f;
-        
+
         // detect excessive sway (CoM getting close to edge of base of support)
         bool swayingNow = normalizedSway > 0.6f; // 60% of half base width
         state.isSwaying = swayingNow ? 1.0f : 0.0f;
@@ -346,13 +356,13 @@ public class BalanceTrackingModule : MotionTrackingModule
 
         state.comVelocity = comVelocity;
 
-        // improved balance:
+        // improved balance determination:
         // 1. Low velocity (stable movement)
         // 2. CoM projection within base of support
         bool hasLowVelocity = comVelocity < StabilityThreshold;
-        
+
         // CoM should be within reasonable distance from base center
-        // if feet apart, allow more deviation
+        // If feet are wide apart, allow more deviation
         float maxAllowedDistance = baseOfSupportWidth * 0.4f; // 40% of base width
         bool withinBaseOfSupport = comToBaseOfSupportDistance < maxAllowedDistance;
 
@@ -379,10 +389,10 @@ public class BalanceTrackingModule : MotionTrackingModule
     {
         if (trackedTrunk != null && trackedLeftForeArm != null && trackedRightForeArm != null &&
             trackedLeftLeg != null && trackedRightLeg != null &&
-            trackedLeftFoot != null && trackedRightFoot != null)
+            trackedLeftToeBase != null && trackedRightToeBase != null)
         {
-            Transform[] joints = { trackedTrunk, trackedLeftForeArm, trackedRightForeArm, 
-                                  trackedLeftLeg, trackedRightLeg, trackedLeftFoot, trackedRightFoot };
+            Transform[] joints = { trackedTrunk, trackedLeftForeArm, trackedRightForeArm,
+                                  trackedLeftLeg, trackedRightLeg, trackedLeftToeBase, trackedRightToeBase };
             Calibrate(joints);
         }
     }

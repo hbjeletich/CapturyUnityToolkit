@@ -37,6 +37,12 @@ public class BalanceTrackingModule : MotionTrackingModule
     private float baseOfSupportWidth = 0f;
     private float comToBaseOfSupportDistance = 0f;
 
+    // FOOT CONTACT DETECTION
+    private bool leftFootInContact = true;
+    private bool rightFootInContact = true;
+    private float leftToeHeight = 0f;
+    private float rightToeHeight = 0f;
+
     // balance state
     private bool isBalanced = true;
     private float swayMagnitude = 0f;
@@ -56,6 +62,9 @@ public class BalanceTrackingModule : MotionTrackingModule
     public float SwayThreshold => manager?.Config?.swayThreshold ?? 0.1f;
     public float StabilityThreshold => manager?.Config?.stabilityThreshold ?? 0.05f;
     public int CoMHistoryFrames => manager?.Config?.comHistoryFrames ?? 180;
+
+    // Use FootModule's lift height for consistency
+    public float MinLiftHeight => manager?.Config?.minLiftHeight ?? 0.05f;
 
     #endregion
     #region Initialize, Calibrate, Joints
@@ -100,6 +109,10 @@ public class BalanceTrackingModule : MotionTrackingModule
             // initialize tracking
             currentCoM = neutralCoM;
             previousCoM = neutralCoM;
+
+            // initialize foot contact state (both feet assumed on ground at calibration)
+            leftFootInContact = true;
+            rightFootInContact = true;
 
             // calculate initial base of support
             UpdateBaseOfSupport();
@@ -227,7 +240,10 @@ public class BalanceTrackingModule : MotionTrackingModule
         previousCoM = currentCoM;
         currentCoM = CalculateCenterOfMass();
 
-        // update base of support from current toe positions
+        // update foot contact detection
+        UpdateFootContact();
+
+        // update base of support from current toe positions and contact state
         UpdateBaseOfSupport();
 
         // update data buffers
@@ -261,17 +277,72 @@ public class BalanceTrackingModule : MotionTrackingModule
         return weightedSum / totalMass;
     }
 
+    private void UpdateFootContact()
+    {
+        leftToeHeight = trackedLeftToeBase.position.y - neutralGroundHeight;
+        rightToeHeight = trackedRightToeBase.position.y - neutralGroundHeight;
+
+        // foot is in contact if height is less than half of MinLiftHeight
+        float contactThreshold = MinLiftHeight * 0.5f;
+
+        bool leftContactNow = leftToeHeight < contactThreshold;
+        bool rightContactNow = rightToeHeight < contactThreshold;
+
+        // update contact state
+        if (leftContactNow != leftFootInContact)
+        {
+            leftFootInContact = leftContactNow;
+            if (DebugMode)
+                Debug.Log($"BalanceTrackingModule: Left foot contact changed to {leftContactNow}");
+        }
+
+        if (rightContactNow != rightFootInContact)
+        {
+            rightFootInContact = rightContactNow;
+            if (DebugMode)
+                Debug.Log($"BalanceTrackingModule: Right foot contact changed to {rightContactNow}");
+        }
+    }
+
     private void UpdateBaseOfSupport()
     {
         // get toe base positions projected onto ground plane (XZ)
         Vector2 leftToePos2D = new Vector2(trackedLeftToeBase.position.x, trackedLeftToeBase.position.z);
         Vector2 rightToePos2D = new Vector2(trackedRightToeBase.position.x, trackedRightToeBase.position.z);
 
-        // center of base of support is midpoint between toes
-        baseOfSupportCenter = (leftToePos2D + rightToePos2D) / 2f;
+        // adaptive base of support based on foot contact
+        if (leftFootInContact && rightFootInContact)
+        {
+            // both feet on ground - use midpoint
+            baseOfSupportCenter = (leftToePos2D + rightToePos2D) / 2f;
+            baseOfSupportWidth = Vector2.Distance(leftToePos2D, rightToePos2D);
+        }
+        else if (leftFootInContact && !rightFootInContact)
+        {
+            // onky left foot on ground - use left foot as base
+            baseOfSupportCenter = leftToePos2D;
+            baseOfSupportWidth = 0.1f;
 
-        // width of base of support
-        baseOfSupportWidth = Vector2.Distance(leftToePos2D, rightToePos2D);
+            if (DebugMode && Time.frameCount % 60 == 0)
+                Debug.Log("BalanceTrackingModule: Using left foot only as base of support");
+        }
+        else if (!leftFootInContact && rightFootInContact)
+        {
+            // only right foot on ground - use right foot as base
+            baseOfSupportCenter = rightToePos2D;
+            baseOfSupportWidth = 0.1f;
+
+            if (DebugMode && Time.frameCount % 60 == 0)
+                Debug.Log("BalanceTrackingModule: Using right foot only as base of support");
+        }
+        else
+        {
+            // no feet on ground (jumping/falling)]
+            // baseOfSupportCenter and baseOfSupportWidth remain unchanged
+
+            if (DebugMode && Time.frameCount % 60 == 0)
+                Debug.Log("BalanceTrackingModule: No feet in contact - maintaining last base of support");
+        }
 
         // calculate CoM projection onto ground plane
         Vector2 comProjection = new Vector2(currentCoM.x, currentCoM.z);
@@ -330,18 +401,34 @@ public class BalanceTrackingModule : MotionTrackingModule
         swayMagnitude = swayVector.magnitude;
         state.swayMagnitude = swayMagnitude;
 
+        // sway threshold based on contact state
+        float swayThresholdMultiplier;
+        if (leftFootInContact && rightFootInContact)
+        {
+            swayThresholdMultiplier = 0.6f;
+        }
+        else if (leftFootInContact || rightFootInContact)
+        {
+            swayThresholdMultiplier = 0.8f;
+        }
+        else
+        {
+            swayThresholdMultiplier = 0.0f;
+        }
+
         // normalize sway by base of support width for better threshold
-        float normalizedSway = baseOfSupportWidth > 0 ? swayMagnitude / (baseOfSupportWidth * 0.5f) : 0f;
+        float normalizedSway = baseOfSupportWidth > 0 ? swayMagnitude / (baseOfSupportWidth * 0.5f) :
+                                                          swayMagnitude / 0.05f; // for single foot
 
         // detect excessive sway (CoM getting close to edge of base of support)
-        bool swayingNow = normalizedSway > 0.6f; // 60% of half base width
+        bool swayingNow = normalizedSway > swayThresholdMultiplier;
         state.isSwaying = swayingNow ? 1.0f : 0.0f;
 
         if (DebugMode && (swayingNow || Time.frameCount % 120 == 0))
         {
             Debug.Log($"BalanceTrackingModule: Lateral: {lateralSway:F3}, AP: {apSway:F3}, " +
                      $"Total: {swayMagnitude:F3}, Normalized: {normalizedSway:F2}, " +
-                     $"BaseWidth: {baseOfSupportWidth:F3}");
+                     $"BaseWidth: {baseOfSupportWidth:F3}, Contact: L={leftFootInContact} R={rightFootInContact}");
         }
     }
 
@@ -361,9 +448,21 @@ public class BalanceTrackingModule : MotionTrackingModule
         // 2. CoM projection within base of support
         bool hasLowVelocity = comVelocity < StabilityThreshold;
 
-        // CoM should be within reasonable distance from base center
-        // If feet are wide apart, allow more deviation
-        float maxAllowedDistance = baseOfSupportWidth * 0.4f; // 40% of base width
+        // stability based on contact state 
+        float maxAllowedDistance;
+        if (leftFootInContact && rightFootInContact)
+        {
+            maxAllowedDistance = baseOfSupportWidth * 0.4f;
+        }
+        else if (leftFootInContact || rightFootInContact)
+        {
+            maxAllowedDistance = baseOfSupportWidth * 0.6f;
+        }
+        else
+        {
+            maxAllowedDistance = 0.0f;
+        }
+
         bool withinBaseOfSupport = comToBaseOfSupportDistance < maxAllowedDistance;
 
         bool wasBalanced = isBalanced;
@@ -378,7 +477,8 @@ public class BalanceTrackingModule : MotionTrackingModule
             Debug.Log($"BalanceTrackingModule: Velocity: {comVelocity:F3} m/s, " +
                      $"CoM Distance from Base: {comToBaseOfSupportDistance:F3}m, " +
                      $"Max Allowed: {maxAllowedDistance:F3}m, " +
-                     $"Balanced: {isBalanced} (velocity OK: {hasLowVelocity}, within base: {withinBaseOfSupport})");
+                     $"Balanced: {isBalanced} (velocity OK: {hasLowVelocity}, within base: {withinBaseOfSupport}), " +
+                     $"Contact: L={leftFootInContact} R={rightFootInContact}");
         }
     }
 
@@ -410,6 +510,16 @@ public class BalanceTrackingModule : MotionTrackingModule
     public float GetBaseOfSupportWidth() => baseOfSupportWidth;
     public Vector2 GetBaseOfSupportCenter() => baseOfSupportCenter;
     public float GetDistanceFromBaseCenter() => comToBaseOfSupportDistance;
+
+    public bool GetLeftFootInContact() => leftFootInContact;
+    public bool GetRightFootInContact() => rightFootInContact;
+    public string GetContactState()
+    {
+        if (leftFootInContact && rightFootInContact) return "Both Feet";
+        if (leftFootInContact) return "Left Foot Only";
+        if (rightFootInContact) return "Right Foot Only";
+        return "No Contact";
+    }
 
     public Vector2 GetSwayComponents()
     {

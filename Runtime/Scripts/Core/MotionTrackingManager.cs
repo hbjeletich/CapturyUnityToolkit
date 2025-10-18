@@ -27,6 +27,7 @@ public class MotionTrackingManager : MonoBehaviour
 
     // state
     private bool isSystemCalibrated = false;
+    private Coroutine activeCalibrationCoroutine = null;
 
     // singleton
     private static MotionTrackingManager instance;
@@ -272,7 +273,33 @@ public class MotionTrackingManager : MonoBehaviour
         }
 
         isSystemCalibrated = true;
+        activeCalibrationCoroutine = null;
         if (enableDebugLogging) Debug.Log("MotionTrackingManager: System calibrated and ready!");
+    }
+
+    private void CleanupModules()
+    {
+        if (enableDebugLogging) Debug.Log("MotionTrackingManager: Cleaning up modules...");
+
+        if (allModules != null)
+        {
+            foreach (var module in allModules)
+            {
+                if (module != null && module.gameObject != null)
+                {
+                    if (enableDebugLogging) Debug.Log($"MotionTrackingManager: Destroying {module.GetType().Name}");
+                    DestroyImmediate(module.gameObject);
+                }
+            }
+            allModules.Clear();
+        }
+
+        // clear module references
+        torsoModule = null;
+        footModule = null;
+        armsModule = null;
+        headModule = null;
+        balanceModule = null;
     }
 
     private void CleanupSystem()
@@ -283,18 +310,7 @@ public class MotionTrackingManager : MonoBehaviour
         if (capturyInput != null && !dontDestroyOnLoad)
             InputSystem.RemoveDevice(capturyInput);
 
-        // clean up module game objects
-        if (allModules != null)
-        {
-            foreach (var module in allModules)
-            {
-                if (module != null && module.gameObject != null)
-                {
-                    DestroyImmediate(module.gameObject);
-                }
-            }
-            allModules.Clear();
-        }
+        CleanupModules();
     }
 
     #endregion
@@ -327,8 +343,68 @@ public class MotionTrackingManager : MonoBehaviour
     public void Recalibrate()
     {
         if (enableDebugLogging) Debug.Log("MotionTrackingManager: Manual recalibration requested");
+
+        // stop any active calibration
+        if (activeCalibrationCoroutine != null)
+        {
+            StopCoroutine(activeCalibrationCoroutine);
+            activeCalibrationCoroutine = null;
+        }
+
+        // mark as not calibrated
         isSystemCalibrated = false;
-        StartCoroutine(CalibrateSystem());
+
+        // start new calibration
+        activeCalibrationCoroutine = StartCoroutine(CalibrateSystem());
+    }
+
+    public void SwapConfiguration(MotionTrackingConfiguration newConfig)
+    {
+        if (newConfig == null)
+        {
+            Debug.LogError("MotionTrackingManager: Cannot swap to null configuration!");
+            return;
+        }
+
+        if (enableDebugLogging)
+            Debug.Log($"MotionTrackingManager: Swapping configuration from '{config?.configurationName ?? "none"}' to '{newConfig.configurationName}'");
+
+        // stop any active calibration
+        if (activeCalibrationCoroutine != null)
+        {
+            StopCoroutine(activeCalibrationCoroutine);
+            activeCalibrationCoroutine = null;
+        }
+
+        bool wasCalibrated = isSystemCalibrated;
+
+        isSystemCalibrated = false;
+
+        CleanupModules();
+
+        // load new configuration
+        config = newConfig;
+
+        if (enableDebugLogging)
+            Debug.Log($"MotionTrackingManager: Initializing new modules for configuration '{config.configurationName}'");
+
+        // reinitialize modules with new config
+        InitializeModules();
+
+        // if we were calibrated before and have joints, recalibrate
+        if (wasCalibrated && jointLookup.Count > 0)
+        {
+            if (enableDebugLogging)
+                Debug.Log("MotionTrackingManager: System was previously calibrated, recalibrating with new configuration...");
+            activeCalibrationCoroutine = StartCoroutine(CalibrateSystem());
+        }
+        else if (jointLookup.Count == 0)
+        {
+            Debug.LogWarning("MotionTrackingManager: No joints available for calibration. Configuration swapped but not calibrated.");
+        }
+
+        if (enableDebugLogging)
+            Debug.Log($"MotionTrackingManager: Configuration swap complete - '{config.configurationName}' with {allModules?.Count ?? 0} active modules");
     }
 
     // public accessors for modules
@@ -345,6 +421,11 @@ public class MotionTrackingManager : MonoBehaviour
     public bool IsHeadModuleEnabled => config.enableHeadModule && headModule?.IsCalibrated == true;
     public bool IsBalanceModuleEnabled => config.enableBalanceModule && balanceModule?.IsCalibrated == true;
 
+    // system state accessors
+    public bool IsSystemCalibrated => isSystemCalibrated;
+    public bool IsCalibrating => activeCalibrationCoroutine != null;
+    public int ActiveModuleCount => allModules?.Count ?? 0;
+    public string CurrentConfigurationName => config?.configurationName ?? "None";
 
     #endregion
 }

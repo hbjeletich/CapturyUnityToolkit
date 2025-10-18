@@ -166,6 +166,9 @@ public class MotionTrackingConfiguration : ScriptableObject
     public string rightForeArmJointName = "RightForeArm";
     public string leftLegJointName = "LeftLeg";
     public string rightLegJointName = "RightLeg";
+    [Tooltip("Toe base joints for balance tracking (base of support calculation)")]
+    public string leftToeBaseJointName = "LeftToeBase";
+    public string rightToeBaseJointName = "RightToeBase";
 
     private void OnValidate()
     {

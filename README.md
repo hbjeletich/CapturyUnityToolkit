@@ -14,6 +14,7 @@ Unity package for motion capture tracking using Captury and Unity's Input System
 - **Gait Analysis** - Step timing, asymmetry, consistency metrics
 - **Arm Tracking** - Hand position and raise detection
 - **Head Tracking** - Position, rotation, nod/shake gesture detection
+- **Balance Tracking** - Center of mass, sway, and balance detection
 - **Configurable** - ScriptableObject-based configuration system
 
 ---
@@ -72,6 +73,7 @@ On the `CapturyNetworkPlugin` component:
    - Foot Module
    - Arms Module
    - Head Module
+   - Balance Module
 
 ### 4. Assign Configuration
 
@@ -146,23 +148,34 @@ public class TrackingExample : MonoBehaviour
 - **Gesture Speed** - Time window for gesture completion
 - **Gesture Timeout** - Maximum active duration
 
+### Balance Module
+- **Balance Tracking** - Center of mass position and buttons for when balance is kept, regained, or lost
+- **Anterior/Posterior Sway** - Values for the amount of swaying, both anterior and posterior
+
 ---
 
 ## Joint Name Configuration
 
-Configure joint names in your configuration asset to match your skeleton. You can upload your own skeleton, but by default it assumes the names of the model that comes with the Captury plugin. 
+Configure joint names in your configuration asset to match your skeleton. You can upload your own skeleton, but by default it assumes the names of the model that comes with the Captury plugin. Note that **each joint can only be accessed by one module at a time**.
 
 | Module | Joint | Default Name |
 |--------|-------|--------------|
 | Torso | Pelvis | `Hips` |
+| Balance | Bottom of Spine | 'Spine1' |
 | Torso | Top of Spine | `Spine4` |
 | Head | Head | `Head` |
 | Arms | Left Shoulder | `LeftShoulder` |
 | Arms | Right Shoulder | `RightShoulder` |
+| Balance | Left Forearm | 'LeftForearm' |
+| Balance | Right Forearm | 'RightForearm' |
 | Arms | Left Hand | `LeftHand` |
 | Arms | Right Hand | `RightHand` |
+| Balance | Left Leg | 'LeftLeg' |
+| Balance | Right Leg | 'RightLeg' |
 | Feet | Left Foot | `LeftFoot` |
 | Feet | Right Foot | `RightFoot` |
+| Balance | Left Toe Base | 'LeftToeBase' |
+| Balance | Right Toe Base | 'RightToeBase' |
 
 ---
 

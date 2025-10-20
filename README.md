@@ -161,21 +161,21 @@ Configure joint names in your configuration asset to match your skeleton. You ca
 | Module | Joint | Default Name |
 |--------|-------|--------------|
 | Torso | Pelvis | `Hips` |
-| Balance | Bottom of Spine | 'Spine1' |
+| Balance | Bottom of Spine | `Spine1` |
 | Torso | Top of Spine | `Spine4` |
 | Head | Head | `Head` |
 | Arms | Left Shoulder | `LeftShoulder` |
 | Arms | Right Shoulder | `RightShoulder` |
-| Balance | Left Forearm | 'LeftForearm' |
-| Balance | Right Forearm | 'RightForearm' |
+| Balance | Left Forearm | `LeftForearm` |
+| Balance | Right Forearm | `RightForearm` |
 | Arms | Left Hand | `LeftHand` |
 | Arms | Right Hand | `RightHand` |
-| Balance | Left Leg | 'LeftLeg' |
-| Balance | Right Leg | 'RightLeg' |
+| Balance | Left Leg | `LeftLeg` |
+| Balance | Right Leg | `RightLeg` |
 | Feet | Left Foot | `LeftFoot` |
 | Feet | Right Foot | `RightFoot` |
-| Balance | Left Toe Base | 'LeftToeBase' |
-| Balance | Right Toe Base | 'RightToeBase' |
+| Balance | Left Toe Base | `LeftToeBase` |
+| Balance | Right Toe Base | `RightToeBase` |
 
 ---
 

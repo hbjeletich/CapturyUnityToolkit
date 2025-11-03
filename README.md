@@ -1,6 +1,6 @@
 # Captury Motion Tracking Toolkit
 
-Unity package for motion capture tracking using Captury and Unity's Input System. Provides modular tracking for torso, feet, arms, and head with walk detection and gait analysis.
+Unity package for motion capture tracking using Captury and Unity's Input System. Provides modular tracking for torso, feet, arms, and head with walk detection and gait analysis and balance tracking.
 
 ---
 

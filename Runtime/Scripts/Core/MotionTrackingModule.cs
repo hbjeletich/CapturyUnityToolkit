@@ -4,7 +4,7 @@ public abstract class MotionTrackingModule : MonoBehaviour
 {
     // each motion tracking module inherits this and is now a MonoBehaviour!
     // internal
-    protected MotionTrackingManager manager;
+    protected IMotionTrackingManager manager;
     protected bool isCalibrated = false;
 
     // public get variables
@@ -13,7 +13,7 @@ public abstract class MotionTrackingModule : MonoBehaviour
     public abstract float Sensitivity { get; }
     public abstract bool DebugMode { get; }
 
-    public virtual void Initialize(MotionTrackingManager manager)
+    public virtual void Initialize(IMotionTrackingManager manager)
     {
         this.manager = manager;
         Debug.Log($"{GetType().Name}: Initialized as GameObject");

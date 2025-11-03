@@ -104,7 +104,7 @@ public class FootTrackingModule : MotionTrackingModule
     #endregion
     #region Initialize, Calibrate, Joints
 
-    public override void Initialize(MotionTrackingManager manager)
+    public override void Initialize(IMotionTrackingManager manager)
     {
         base.Initialize(manager);
 

@@ -16,7 +16,7 @@ MonoBehaviour:
   description: Default motion tracking setup
   calibrationDelay: 1
   calibrationFrames: 30
-  enableTorsoModule: 0
+  enableTorsoModule: 1
   torsoSensitivity: 1
   torsoDebugMode: 1
   isShiftTracked: 1
@@ -25,7 +25,7 @@ MonoBehaviour:
   wholeBodyMovementThreshold: 3
   isBendTracked: 1
   bentOverAngleThreshold: 30
-  enableFootModule: 0
+  enableFootModule: 1
   footSensitivity: 1
   footDebugMode: 1
   isFootRaiseTracked: 0
@@ -45,7 +45,7 @@ MonoBehaviour:
   minReasonableStepTime: 0.3
   positionHistoryFrames: 300
   eventHistoryCount: 20
-  enableArmsModule: 0
+  enableArmsModule: 1
   armsSensitivity: 1
   armsDebugMode: 0
   isHandPositionTracked: 1
@@ -53,7 +53,7 @@ MonoBehaviour:
   isHandRaiseTracked: 1
   handRaiseThreshold: 0.3
   handRaiseMinHeight: 0.1
-  enableHeadModule: 0
+  enableHeadModule: 1
   headSensitivity: 1
   headDebugMode: 0
   isHeadPositionTracked: 1
@@ -89,3 +89,5 @@ MonoBehaviour:
   rightForeArmJointName: RightForeArm
   leftLegJointName: LeftLeg
   rightLegJointName: RightLeg
+  leftToeBaseJointName: LeftToeBase
+  rightToeBaseJointName: RightToeBase

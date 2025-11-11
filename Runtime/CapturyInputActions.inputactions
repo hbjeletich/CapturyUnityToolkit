@@ -604,6 +604,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "HeadPosition2",
+                    "type": "Value",
+                    "id": "df2deaa2-d1e7-4ed0-9df3-594c54ca81e0",
+                    "expectedControlType": "Vector3",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
                 }
             ],
             "bindings": [
@@ -648,6 +657,17 @@
                     "processors": "",
                     "groups": "",
                     "action": "HeadShaking",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "2e88d026-0b5f-45bb-9680-0e56edff7ac9",
+                    "path": "<CapturyInput1>/headPosition2",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "HeadPosition2",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

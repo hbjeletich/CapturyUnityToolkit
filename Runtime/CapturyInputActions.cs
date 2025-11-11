@@ -626,6 +626,15 @@ public partial class @CapturyInputActions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""HeadPosition2"",
+                    ""type"": ""Value"",
+                    ""id"": ""df2deaa2-d1e7-4ed0-9df3-594c54ca81e0"",
+                    ""expectedControlType"": ""Vector3"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
                 }
             ],
             ""bindings"": [
@@ -670,6 +679,17 @@ public partial class @CapturyInputActions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""groups"": """",
                     ""action"": ""HeadShaking"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""2e88d026-0b5f-45bb-9680-0e56edff7ac9"",
+                    ""path"": ""<CapturyInput1>/headPosition2"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""HeadPosition2"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 }
@@ -905,6 +925,7 @@ public partial class @CapturyInputActions: IInputActionCollection2, IDisposable
         m_Head_HeadRotation = m_Head.FindAction("HeadRotation", throwIfNotFound: true);
         m_Head_HeadNodding = m_Head.FindAction("HeadNodding", throwIfNotFound: true);
         m_Head_HeadShaking = m_Head.FindAction("HeadShaking", throwIfNotFound: true);
+        m_Head_HeadPosition2 = m_Head.FindAction("HeadPosition2", throwIfNotFound: true);
         // Balance
         m_Balance = asset.FindActionMap("Balance", throwIfNotFound: true);
         m_Balance_CenterOfMassPosition = m_Balance.FindAction("CenterOfMassPosition", throwIfNotFound: true);
@@ -1311,6 +1332,7 @@ public partial class @CapturyInputActions: IInputActionCollection2, IDisposable
     private readonly InputAction m_Head_HeadRotation;
     private readonly InputAction m_Head_HeadNodding;
     private readonly InputAction m_Head_HeadShaking;
+    private readonly InputAction m_Head_HeadPosition2;
     public struct HeadActions
     {
         private @CapturyInputActions m_Wrapper;
@@ -1319,6 +1341,7 @@ public partial class @CapturyInputActions: IInputActionCollection2, IDisposable
         public InputAction @HeadRotation => m_Wrapper.m_Head_HeadRotation;
         public InputAction @HeadNodding => m_Wrapper.m_Head_HeadNodding;
         public InputAction @HeadShaking => m_Wrapper.m_Head_HeadShaking;
+        public InputAction @HeadPosition2 => m_Wrapper.m_Head_HeadPosition2;
         public InputActionMap Get() { return m_Wrapper.m_Head; }
         public void Enable() { Get().Enable(); }
         public void Disable() { Get().Disable(); }
@@ -1340,6 +1363,9 @@ public partial class @CapturyInputActions: IInputActionCollection2, IDisposable
             @HeadShaking.started += instance.OnHeadShaking;
             @HeadShaking.performed += instance.OnHeadShaking;
             @HeadShaking.canceled += instance.OnHeadShaking;
+            @HeadPosition2.started += instance.OnHeadPosition2;
+            @HeadPosition2.performed += instance.OnHeadPosition2;
+            @HeadPosition2.canceled += instance.OnHeadPosition2;
         }
 
         private void UnregisterCallbacks(IHeadActions instance)
@@ -1356,6 +1382,9 @@ public partial class @CapturyInputActions: IInputActionCollection2, IDisposable
             @HeadShaking.started -= instance.OnHeadShaking;
             @HeadShaking.performed -= instance.OnHeadShaking;
             @HeadShaking.canceled -= instance.OnHeadShaking;
+            @HeadPosition2.started -= instance.OnHeadPosition2;
+            @HeadPosition2.performed -= instance.OnHeadPosition2;
+            @HeadPosition2.canceled -= instance.OnHeadPosition2;
         }
 
         public void RemoveCallbacks(IHeadActions instance)
@@ -1525,6 +1554,7 @@ public partial class @CapturyInputActions: IInputActionCollection2, IDisposable
         void OnHeadRotation(InputAction.CallbackContext context);
         void OnHeadNodding(InputAction.CallbackContext context);
         void OnHeadShaking(InputAction.CallbackContext context);
+        void OnHeadPosition2(InputAction.CallbackContext context);
     }
     public interface IBalanceActions
     {

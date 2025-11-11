@@ -34,7 +34,7 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
         public Dictionary<string, Transform> joints;
         public List<MotionTrackingModule> modules;
         public CapturyInput inputDevice;
-        public SkeletonMotionTrackingContext context;
+        public SkeletonMotionTrackingContext context;  // Per-skeleton context for modules
         
         public bool isCalibrated;
         public Coroutine calibrationCoroutine;
@@ -87,11 +87,13 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
 
     #region Unity Lifecycle
 
-    void Awake()
+    private void Awake()
     {
+        CapturyInput.Register();
         SetupSingleton();
         ValidateConfiguration();
     }
+
 
     void Start()
     {
@@ -174,6 +176,17 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
 
     private void OnSkeletonFound(CapturySkeleton skeleton)
     {
+        if (trackedSkeletons.Count >= maxPlayers)
+        {
+            if (enableDebugLogging)
+                Debug.Log($"MultiplayerMotionTrackingManager: Max players ({maxPlayers}) reached. Ignoring skeleton {skeleton.id}");
+            return;
+        }
+
+        // CRITICAL: Subscribe to event IMMEDIATELY before queuing
+        // The event can fire before Update() processes the queue!
+        skeleton.OnSkeletonSetupComplete += OnIndividualSkeletonSetupComplete;
+
         lock (skeletonQueueLock)
         {
             skeletonsToAdd.Enqueue(skeleton);
@@ -211,7 +224,7 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
             while (skeletonsToRemove.Count > 0)
             {
                 CapturySkeleton skeleton = skeletonsToRemove.Dequeue();
-                CleanupSkeleton(skeleton.id);
+                CleanupSkeleton(skeleton);
             }
         }
     }
@@ -239,21 +252,40 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
 
         trackedSkeletons.Add(skeleton.id, skeletonData);
 
-        skeleton.OnSkeletonSetupComplete += OnIndividualSkeletonSetupComplete;
-
-        if (enableDebugLogging)
-            Debug.Log($"MultiplayerMotionTrackingManager: {skeletonData.playerLabel} waiting for skeleton setup to complete...");
+        // Note: Event subscription happens in OnSkeletonFound() to ensure we don't miss it
+        
+        // Check if skeleton is already set up (event may have fired before we processed queue)
+        if (skeleton.joints != null && skeleton.joints.Length > 0)
+        {
+            if (enableDebugLogging)
+                Debug.Log($"MultiplayerMotionTrackingManager: Skeleton {skeleton.id} already set up, initializing immediately...");
+            OnIndividualSkeletonSetupComplete(skeleton);
+        }
+        else
+        {
+            if (enableDebugLogging)
+                Debug.Log($"MultiplayerMotionTrackingManager: {skeletonData.playerLabel} waiting for skeleton setup to complete...");
+        }
     }
 
     private void OnIndividualSkeletonSetupComplete(CapturySkeleton skeleton)
     {
         if (!trackedSkeletons.ContainsKey(skeleton.id))
         {
-            Debug.LogWarning($"MultiplayerMotionTrackingManager: Skeleton {skeleton.id} setup complete but not in tracked list!");
+            if (enableDebugLogging)
+                Debug.LogWarning($"MultiplayerMotionTrackingManager: Skeleton {skeleton.id} setup complete but not in tracked list yet (will process when queue is handled)");
             return;
         }
 
         SkeletonTrackingData skeletonData = trackedSkeletons[skeleton.id];
+        
+        // Guard against double-initialization
+        if (skeletonData.inputDevice != null)
+        {
+            if (enableDebugLogging)
+                Debug.Log($"MultiplayerMotionTrackingManager: {skeletonData.playerLabel} already initialized, skipping");
+            return;
+        }
 
         if (enableDebugLogging)
             Debug.Log($"MultiplayerMotionTrackingManager: Skeleton setup complete for {skeletonData.playerLabel}, building joint lookup...");
@@ -297,13 +329,22 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
 
     private void CreateInputDevice(SkeletonTrackingData skeletonData)
     {
-        string deviceName = $"CapturyInput_{skeletonData.playerLabel.Replace(" ", "")}";
-        
-        skeletonData.inputDevice = InputSystem.AddDevice<CapturyInput>(deviceName);
-        
+        // Create device using the layout name (not a custom device name)
+        skeletonData.inputDevice = InputSystem.AddDevice<CapturyInput>();
+
+        if (skeletonData.inputDevice == null)
+        {
+            Debug.LogError($"MultiplayerMotionTrackingManager: FAILED to create CapturyInput for {skeletonData.playerLabel}");
+            return;
+        }
+
+        // Set the device usage - this is how you differentiate players in your Input Action Asset
+        InputSystem.SetDeviceUsage(skeletonData.inputDevice, $"Player{skeletonData.playerNumber}");
+
         if (enableDebugLogging)
-            Debug.Log($"MultiplayerMotionTrackingManager: Created input device '{deviceName}' for {skeletonData.playerLabel}");
+            Debug.Log($"MultiplayerMotionTrackingManager: Created CapturyInput device with usage 'Player{skeletonData.playerNumber}' for {skeletonData.playerLabel}");
     }
+
 
     private void CreateModules(SkeletonTrackingData skeletonData)
     {
@@ -438,6 +479,9 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
         }
 
         CapturyInputState state = new CapturyInputState();
+        
+        // Set player identification
+        state.playerIndex = skeletonData.playerNumber;
 
         Transform[] joints = skeletonData.joints.Values.ToArray();
 
@@ -452,6 +496,16 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
     #endregion
 
     #region Cleanup
+
+    private void CleanupSkeleton(CapturySkeleton skeleton)
+    {
+        if (skeleton != null)
+        {
+            // Unsubscribe from event to prevent memory leaks
+            skeleton.OnSkeletonSetupComplete -= OnIndividualSkeletonSetupComplete;
+        }
+        CleanupSkeleton(skeleton?.id ?? -1);
+    }
 
     private void CleanupSkeleton(int skeletonId)
     {

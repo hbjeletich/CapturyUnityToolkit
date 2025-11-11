@@ -579,7 +579,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 086a399939e6c094886da367ef9f81ca, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  host: 192.168.10.106
+  host: 127.0.0.1
   port: 2101
   scaleFactor: 0.001
   actorCheckTimeout: 500
@@ -852,12 +852,15 @@ MonoBehaviour:
   m_GameObject: {fileID: 936380557}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e3466cb74b4047d4aa95a8ce25b905ed, type: 3}
+  m_Script: {fileID: 11500000, guid: 24129bd05abb0e440b0064a213ff6e3b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   config: {fileID: 11400000, guid: fdf4737da78961f46a64210e924aa29c, type: 2}
   dontDestroyOnLoad: 1
   enableDebugLogging: 1
+  automaticCalibration: 1
+  maxPlayers: 4
+  calibrationDelayPerSkeleton: 2
 --- !u!4 &1078959930 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -7319627266442758279, guid: ab78030e69a85bd4fa93d69411643cb1,

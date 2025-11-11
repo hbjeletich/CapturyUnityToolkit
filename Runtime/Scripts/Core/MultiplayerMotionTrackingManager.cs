@@ -34,6 +34,7 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
         public Dictionary<string, Transform> joints;
         public List<MotionTrackingModule> modules;
         public CapturyInput inputDevice;
+        public SkeletonMotionTrackingContext context;
         
         public bool isCalibrated;
         public Coroutine calibrationCoroutine;
@@ -233,6 +234,7 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
             Debug.Log($"MultiplayerMotionTrackingManager: Processing new skeleton - ID: {skeleton.id}, Name: {skeleton.name}");
 
         SkeletonTrackingData skeletonData = new SkeletonTrackingData(skeleton.id, skeleton.name, nextPlayerNumber);
+        skeletonData.context = new SkeletonMotionTrackingContext(this, skeleton.id);  // Create skeleton-specific context
         nextPlayerNumber++;
 
         trackedSkeletons.Add(skeleton.id, skeletonData);
@@ -315,7 +317,7 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
             GameObject torsoObj = new GameObject("TorsoTrackingModule");
             torsoObj.transform.SetParent(moduleParent.transform);
             skeletonData.torsoModule = torsoObj.AddComponent<TorsoTrackingModule>();
-            skeletonData.torsoModule.Initialize(this);
+            skeletonData.torsoModule.Initialize(skeletonData.context);
             skeletonData.modules.Add(skeletonData.torsoModule);
         }
 
@@ -324,7 +326,7 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
             GameObject footObj = new GameObject("FootTrackingModule");
             footObj.transform.SetParent(moduleParent.transform);
             skeletonData.footModule = footObj.AddComponent<FootTrackingModule>();
-            skeletonData.footModule.Initialize(this);
+            skeletonData.footModule.Initialize(skeletonData.context);
             skeletonData.modules.Add(skeletonData.footModule);
         }
 
@@ -333,7 +335,7 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
             GameObject armsObj = new GameObject("ArmTrackingModule");
             armsObj.transform.SetParent(moduleParent.transform);
             skeletonData.armsModule = armsObj.AddComponent<ArmTrackingModule>();
-            skeletonData.armsModule.Initialize(this);
+            skeletonData.armsModule.Initialize(skeletonData.context);
             skeletonData.modules.Add(skeletonData.armsModule);
         }
 
@@ -342,7 +344,7 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
             GameObject headObj = new GameObject("HeadTrackingModule");
             headObj.transform.SetParent(moduleParent.transform);
             skeletonData.headModule = headObj.AddComponent<HeadTrackingModule>();
-            skeletonData.headModule.Initialize(this);
+            skeletonData.headModule.Initialize(skeletonData.context);
             skeletonData.modules.Add(skeletonData.headModule);
         }
 
@@ -351,7 +353,7 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
             GameObject balanceObj = new GameObject("BalanceTrackingModule");
             balanceObj.transform.SetParent(moduleParent.transform);
             skeletonData.balanceModule = balanceObj.AddComponent<BalanceTrackingModule>();
-            skeletonData.balanceModule.Initialize(this);
+            skeletonData.balanceModule.Initialize(skeletonData.context);
             skeletonData.modules.Add(skeletonData.balanceModule);
         }
 

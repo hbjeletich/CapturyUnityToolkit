@@ -65,7 +65,6 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
     private CapturyNetworkPlugin networkPlugin;
     
     private Dictionary<int, SkeletonTrackingData> trackedSkeletons = new Dictionary<int, SkeletonTrackingData>();
-    private int nextPlayerNumber = 1;
 
     private readonly object skeletonQueueLock = new object();
     private Queue<CapturySkeleton> skeletonsToAdd = new Queue<CapturySkeleton>();
@@ -176,7 +175,7 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
 
     private void OnSkeletonFound(CapturySkeleton skeleton)
     {
-        if (trackedSkeletons.Count >= maxPlayers)
+        if (trackedSkeletons.Count + skeletonsToAdd.Count >= maxPlayers)
         {
             if (enableDebugLogging)
                 Debug.Log($"MultiplayerMotionTrackingManager: Max players ({maxPlayers}) reached. Ignoring skeleton {skeleton.id}");
@@ -210,6 +209,24 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
     #endregion
 
     #region Skeleton Setup
+
+    private int GetNextAvailablePlayerNumber()
+    {
+        for (int i = 1; i <= maxPlayers; i++)
+        {
+            bool isUsed = false;
+            foreach (var skeleton in trackedSkeletons.Values)
+            {
+                if (skeleton.playerNumber == i)
+                {
+                    isUsed = true;
+                    break;
+                }
+            }
+            if (!isUsed) return i;
+        }
+        return -1;
+    }
 
     private void ProcessSkeletonQueues()
     {
@@ -246,9 +263,15 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
         if (enableDebugLogging)
             Debug.Log($"MultiplayerMotionTrackingManager: Processing new skeleton - ID: {skeleton.id}, Name: {skeleton.name}");
 
-        SkeletonTrackingData skeletonData = new SkeletonTrackingData(skeleton.id, skeleton.name, nextPlayerNumber);
-        skeletonData.context = new SkeletonMotionTrackingContext(this, skeleton.id);  // Create skeleton-specific context
-        nextPlayerNumber++;
+        int playerNumber = GetNextAvailablePlayerNumber();
+        if (playerNumber == -1)
+        {
+            Debug.LogError($"MultiplayerMotionTrackingManager: No available player slots for skeleton {skeleton.id}");
+            return;
+        }
+
+        SkeletonTrackingData skeletonData = new SkeletonTrackingData(skeleton.id, skeleton.name, playerNumber);
+        skeletonData.context = new SkeletonMotionTrackingContext(this, skeleton.id);
 
         trackedSkeletons.Add(skeleton.id, skeletonData);
 

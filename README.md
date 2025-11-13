@@ -16,6 +16,7 @@ Unity package for motion capture tracking using Captury and Unity's Input System
 - **Head Tracking** - Position, rotation, nod/shake gesture detection
 - **Balance Tracking** - Center of mass, sway, and balance detection
 - **Configurable** - ScriptableObject-based configuration system
+- **Multiplayer Support** - Supports multiple captury skeletons with instanced input action assets
 
 ---
 
@@ -49,13 +50,24 @@ Add this line to your `Packages/manifest.json`:
 
 ### 1. Scene Setup
 
-Add these components to a GameObject in your scene:
+Use the BaseScene for fastest setup for singleplayer. 
+
+For existing scenes or starting from scratch, add these components to a GameObject in your scene:
 
 | Component | Source | Purpose |
 |-----------|--------|---------|
 | `CapturyNetworkPlugin` | Captury Plugin | Connects to CapturyLive |
 | `CapturyInputManager` | This Package | Registers input device |
 | `MotionTrackingManager` | This Package | Main tracking manager |
+
+If you're doing multiplayer, the components are slightly different:
+
+| Component | Source | Purpose |
+|-----------|--------|---------|
+| `CapturyNetworkPlugin` | Captury Plugin | Connects to CapturyLive |
+| `MultiplayerTrackingManager` | This Package | Main tracking manager, handles input device registration |
+
+
 
 ### 2. Configure Captury Connection
 
@@ -77,15 +89,17 @@ On the `CapturyNetworkPlugin` component:
 
 ### 4. Assign Configuration
 
-Drag your configuration asset to the **Config** field on `MotionTrackingManager`.
+Drag your configuration asset to the **Config** field on `MotionTrackingManager` or `MultiplayerTrackingManager`.
 
-### 5. Access Tracking Data
+### 5. Access Tracking Data -- Singleplayer
+
+To directly find input actions from the input device:
 
 ```csharp
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-public class TrackingExample : MonoBehaviour
+public class DirectInputTrackingExample : MonoBehaviour
 {
     void Update()
     {
@@ -113,9 +127,172 @@ public class TrackingExample : MonoBehaviour
 }
 ```
 
+You can also use an `InputActionAsset`, or the MotionTracking one created for you already:
+
+```csharp
+using UnityEngine;
+using UnityEngine.InputSystem;
+
+public class InputActionAssetTrackingExample : MonoBehaviour
+{
+    // assign Input Action Asset in the Inspector
+    public InputActionAsset inputActions;
+
+    private InputAction isWalkingAction;
+    private InputAction walkSpeedAction;
+    private InputAction weightShiftLeftAction;
+
+    void Awake()
+    {
+        // must be in AWAKE!
+        // assuming you're using the given MotionTracking asset, action maps are separated by module
+        var footMap = inputActions.FindActionMap("Foot");
+        var torsoMap = inputActions.FindActionMap("Torso");
+
+        // find specific actions
+        isWalkingAction = footMap.FindAction("IsWalking");
+        walkSpeedAction = footMap.FindAction("WalkSpeed");
+        weightShiftLeftAction = torsoMap.FindAction("WeightShiftLeft");
+    }
+
+    void OnEnable()
+    {
+        // enable the actions
+        isWalkingAction.Enable();
+        walkSpeedAction.Enable();
+        weightShiftLeftAction.Enable();
+
+        isWalkingAction.performed += OnWalk;
+        weightShiftLeftAction.performed += OnWeightShiftLeft;
+    }
+
+    void OnEnable()
+    {
+        // disable the actions
+        isWalkingAction.Disable();
+        walkSpeedAction.Disable();
+        weightShiftLeftAction.Disable();
+
+        isWalkingAction.performed -= OnWalk;
+        weightShiftLeftAction.performed -= OnWeightShiftLeft;
+    }
+
+    void OnWalk(InputAction.CallbackContext ctx)
+    {
+        float walkSpeed = walkSpeedAction.ReadValue<float>();
+        Debug.Log($"Walking at {speed} m/s");
+    }
+
+    void OnWeightShift(InputAction.CallbackContext ctx)
+    {
+        Debug.Log("Weight shifted left");
+    }
+}
+```
+
+Though the setup for this is a little longer, it is a much better, more modular way to call the actions, especially if you have more complex control schemes. 
+
+### 6. Access Tracking Data -- Multiplayer
+
+Multiplayer works a little differently. The best way to get started with multiple skeletons is by instancing your InputActionAsset. 
+
+This approach is similar to the above, but rather than using the map directly, instantiates it to ensure that it will only be tied to one player's actions. You can put this same script on each player object. 
+
+```csharp
+using UnityEngine;
+using UnityEngine.InputSystem;
+
+public class MultiplayerTrackingExample : MonoBehaviour
+{
+    // assign Input Action Asset in the Inspector
+    public InputActionAsset inputActions;
+    public int playerNumber;
+
+    private InputAction isWalkingAction;
+    private InputAction walkSpeedAction;
+    private InputAction weightShiftLeftAction;
+
+    void Awake()
+    {
+        instancedActions = Instantiate(inputActions);
+
+        // must be in AWAKE!
+        // use instanced asset for maps
+        var footMap = instancedActions.FindActionMap("Foot");
+        var torsoMap = instancedActions.FindActionMap("Torso");
+
+        // find specific actions
+        isWalkingAction = footMap.FindAction("IsWalking");
+        walkSpeedAction = footMap.FindAction("WalkSpeed");
+        weightShiftLeftAction = torsoMap.FindAction("WeightShiftLeft");
+
+        // override binding to read from this specific player's device
+        // format: <DeviceType>{Usage}/controlPath
+        string devicePath = $"<CapturyInput>{{Player{playerNumber}}}/headPosition";
+        headPositionAction.ApplyBindingOverride(devicePath);
+    }
+
+    void OnEnable()
+    {
+        // enable the actions
+        isWalkingAction.Enable();
+        walkSpeedAction.Enable();
+        weightShiftLeftAction.Enable();
+
+        isWalkingAction.performed += OnWalk;
+        weightShiftLeftAction.performed += OnWeightShiftLeft;
+    }
+
+    void OnEnable()
+    {
+        // disable the actions
+        isWalkingAction.Disable();
+        walkSpeedAction.Disable();
+        weightShiftLeftAction.Disable();
+
+        isWalkingAction.performed -= OnWalk;
+        weightShiftLeftAction.performed -= OnWeightShiftLeft;
+    }
+
+    void OnDestroy()
+    {
+        // clean up instanced action asset
+        if (instancedActions != null)
+        {
+            instancedActions.Disable();
+            Destroy(instancedActions);
+        }
+    }
+
+    void OnWalk(InputAction.CallbackContext ctx)
+    {
+        float walkSpeed = walkSpeedAction.ReadValue<float>();
+        Debug.Log($"Player {playerNumber}: Walking at {speed} m/s");
+    }
+
+    void OnWeightShift(InputAction.CallbackContext ctx)
+    {
+        Debug.Log($"Player {playerNumber}: Weight shifted left");
+    }
+}
+```
+
+As long as you've set up your awake to use an instanced version of the asset and override the bindings to work with the correct device, you can then use the actions as you would with any other InputActionAsset!
+
+There are also other solutions, but that may require more setup. You can create a new InputActionAsset with different maps having different players, and you would rebind the same (or different, depending on your controls!) actions to different input devices. The format for the multiplayer bindings is `<DeviceType>{Usage}/controlPath`
+
 ---
 
 ## Configuration Options
+
+### Motion Tracking Manager
+- **Modular System** - Use what you need, don't use what you don't
+- **Configuration Scriptables** - Create your own configurations and swap between them in editor or during runtime
+- **Calibration Setup** - Automatically or manually calibrate your modules, setting your own delays and calling the calibrate method when necessary
+
+### Multiplayer Manager
+- **Maximum Players** - Set a number of max players accepted
+- **Calibration Preferences** - Decide if calibration will happen automatically, and the delay (in seconds) between calibrating skeletons
 
 ### Torso Module
 - **Weight Shift Threshold** - Distance required to trigger weight shift detection
@@ -203,3 +380,7 @@ This package includes the **Captury Unity Plugin**:
 - Torso, foot, arm, and head tracking modules
 - Walk detection and gait analysis
 - Input System integration
+
+### 1.1.0 & 1.1.1
+- Added balance tracking support
+- Fixed foot tracking relative position bug

@@ -228,8 +228,9 @@ public class MultiplayerTrackingExample : MonoBehaviour
 
         // override binding to read from this specific player's device
         // format: <DeviceType>{Usage}/controlPath
-        string devicePath = $"<CapturyInput>{{Player{playerNumber}}}/headPosition";
-        headPositionAction.ApplyBindingOverride(devicePath);
+        isWalkingAction.ApplyBindingOverride($"<CapturyInput>{{Player{playerNumber}}}/isWalkingAction");
+        walkSpeedAction.ApplyBindingOverride($"<CapturyInput>{{Player{playerNumber}}}/walkSpeedAction");
+        weightShiftLeftAction.ApplyBindingOverride($"<CapturyInput>{{Player{playerNumber}}}/weightShiftLeftAction");
     }
 
     void OnEnable()

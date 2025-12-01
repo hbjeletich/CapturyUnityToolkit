@@ -10,42 +10,42 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3c0ac5af9e504174082cd7401bffa208, type: 3}
-  m_Name: TestConfig
+  m_Name: EmptyConfig
   m_EditorClassIdentifier: 
-  configurationName: Default
-  description: Default motion tracking setup
-  calibrationDelay: 1
+  configurationName: Empty
+  description: This configuration has absolutely nothing tracked. Beware!
+  calibrationDelay: 2
   calibrationFrames: 30
-  enableTorsoModule: 1
+  enableTorsoModule: 0
   torsoSensitivity: 1
-  torsoDebugMode: 1
+  torsoDebugMode: 0
   isShiftTracked: 1
-  weightShiftThreshold: 0.2
-  neutralZoneWidth: 0.075
-  wholeBodyMovementThreshold: 3
+  weightShiftThreshold: 0.15
+  neutralZoneWidth: 0.05
+  wholeBodyMovementThreshold: 0.8
   isBendTracked: 1
   bentOverAngleThreshold: 30
-  enableFootModule: 1
+  enableFootModule: 0
   footSensitivity: 1
-  footDebugMode: 1
-  isFootRaiseTracked: 0
+  footDebugMode: 0
+  isFootRaiseTracked: 1
   footRaiseThreshold: 0.1
-  isHipAbductionTracked: 0
+  isHipAbductionTracked: 1
   minAbductionDistance: 0.2
   minLiftHeight: 0.05
-  isFootPositionTracked: 0
+  isFootPositionTracked: 1
   useRelativeFootPosition: 1
   enableWalkTracking: 0
-  walkSpeedThreshold: 1
-  minimumWalkDuration: 1
-  walkStopThreshold: 0.8
+  walkSpeedThreshold: 0.3
+  minimumWalkDuration: 2
+  walkStopThreshold: 0.1
   enableGaitAnalysis: 0
   minimumCyclesForAnalysis: 3
   maxReasonableStepTime: 2
   minReasonableStepTime: 0.3
   positionHistoryFrames: 300
   eventHistoryCount: 20
-  enableArmsModule: 1
+  enableArmsModule: 0
   armsSensitivity: 1
   armsDebugMode: 0
   isHandPositionTracked: 1
@@ -53,7 +53,7 @@ MonoBehaviour:
   isHandRaiseTracked: 1
   handRaiseThreshold: 0.3
   handRaiseMinHeight: 0.1
-  enableHeadModule: 1
+  enableHeadModule: 0
   headSensitivity: 1
   headDebugMode: 0
   isHeadPositionTracked: 1
@@ -66,7 +66,7 @@ MonoBehaviour:
   headRightThreshold: 20
   enableBalanceModule: 0
   balanceSensitivity: 1
-  balanceDebugMode: 1
+  balanceDebugMode: 0
   isCoMTracked: 1
   isSwayTracked: 1
   isStabilityTracked: 1

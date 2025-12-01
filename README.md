@@ -1,6 +1,6 @@
 # Captury Motion Tracking Toolkit
 
-Unity package for motion capture tracking using Captury and Unity's Input System. Provides modular tracking for torso, feet, arms, and head with walk detection and gait analysis.
+Unity package for motion capture tracking using Captury and Unity's Input System. Provides modular tracking for torso, feet, arms, and head with walk detection and gait analysis and balance tracking.
 
 ---
 
@@ -14,7 +14,7 @@ Unity package for motion capture tracking using Captury and Unity's Input System
 - **Gait Analysis** - Step timing, asymmetry, consistency metrics
 - **Arm Tracking** - Hand position and raise detection
 - **Head Tracking** - Position, rotation, nod/shake gesture detection
-- **Balance Tracking** - Center of mass, sway, and balance detection
+- **Balance Tracking** - Center of mass position and velocity, lateral sway, anterior/posterior sway
 - **Configurable** - ScriptableObject-based configuration system
 - **Multiplayer Support** - Supports multiple captury skeletons with instanced input action assets
 
@@ -95,6 +95,10 @@ Drag your configuration asset to the **Config** field on `MotionTrackingManager`
 
 To directly find input actions from the input device:
 
+There are two ways to access tracking data. You can access it directly using the input device, or by using the provided Input Action Asset. 
+
+#### Calling Directly
+
 ```csharp
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -103,29 +107,74 @@ public class DirectInputTrackingExample : MonoBehaviour
 {
     void Update()
     {
+        // find captury input device
         var captury = InputSystem.GetDevice<CapturyInput>();
         
         if (captury != null)
         {
-            // Check if walking
+            // check if walking
             if (captury.isWalking.isPressed)
             {
+                // read the value of our speed
                 float speed = captury.walkSpeed.ReadValue();
                 Debug.Log($"Walking at {speed} m/s");
             }
             
-            // Check weight shift
+            // check weight shift
             if (captury.weightShiftLeft.isPressed)
             {
                 Debug.Log("Weight shifted left");
             }
             
-            // Get foot position
+            // get foot position
             Vector3 leftFoot = captury.leftFootPosition.ReadValue();
+
+            // do whatever you want with these numbers!
+            // for now, print the x, y, and z separately
+            Debug.Log($"Left foot X: {leftFoot.x}");
+            Debug.Log($"Left foot Y: {leftFoot.y}");
+            Debug.Log($"Left foot Z: {leftFoot.z}");
         }
     }
 }
 ```
+#### Using Input Action Asset
+
+```csharp
+using UnityEngine;
+using UnityEngine.InputSystem;
+
+public class TrackingExample : MonoBehaviour
+{
+    public InputActionAsset inputActions;
+
+    private InputAction weightShiftXAction;
+    private InputAction footRaisedAction;
+    private InputAction footLoweredAction;
+
+    void Awake()
+    {
+        // make sure this is AWAKE and not start!
+        // find the maps within the action asset
+        var torsoMap = inputActions.FindActionMap("Torso");
+        var footMap = inputActions.FindActionMap("Foot");
+
+        // find the specific actions
+        weightShiftXAction = torsoMap.FindAction("WeightShiftX");
+        footRaisedAction = footMap.FindAction("FootRaised");
+        footLowerAction = actionMap.FindAction("FootLowered");
+
+        // subscribe foot actions to methods
+        footRaiseAction.performed += OnFootRaise;
+        footLowerAction.performed += OnFootLower;
+    }
+
+    private void OnEnable()
+    {
+        weightShiftXAction.Enable();
+        footRaiseAction.Enable();
+        footLowerAction.Enable();
+    }
 
 You can also use an `InputActionAsset`, or the MotionTracking one created for you already:
 
@@ -344,8 +393,8 @@ For most use cases, **direct device access is recommended** as it's more straigh
 - **Gesture Timeout** - Maximum active duration
 
 ### Balance Module
-- **Balance Tracking** - Center of mass position and buttons for when balance is kept, regained, or lost
-- **Anterior/Posterior Sway** - Values for the amount of swaying, both anterior and posterior
+- **Sway and Stability Thresholds** - Max stability in m/s
+- **Center of Mass Frame History** - Frames of CoM history to keep
 
 ---
 
@@ -369,6 +418,11 @@ Configure joint names in your configuration asset to match your skeleton. You ca
 | Balance | Right Leg | `RightLeg` |
 | Feet | Left Foot | `LeftFoot` |
 | Feet | Right Foot | `RightFoot` |
+| Balance | Bottom of Spine | `Spine1` |
+| Balance | Left Forearm | `LeftForeArm` |
+| Balance | Right Forearm | `RightForeArm` |
+| Balance | Left Leg | `LeftLeg` |
+| Balance | Right Leg | `RightLeg` |
 | Balance | Left Toe Base | `LeftToeBase` |
 | Balance | Right Toe Base | `RightToeBase` |
 
@@ -402,3 +456,6 @@ This package includes the **Captury Unity Plugin**:
 ### 1.1.0 & 1.1.1
 - Added balance tracking support
 - Fixed foot tracking relative position bug
+
+### 1.2.0
+- Added Multiplayer support (multiple skeletons tracked by the same system)

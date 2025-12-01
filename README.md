@@ -194,93 +194,110 @@ Though the setup for this is a little longer, it is a much better, more modular 
 
 ### 6. Access Tracking Data -- Multiplayer
 
-Multiplayer works a little differently. The best way to get started with multiple skeletons is by instancing your InputActionAsset. 
+For multiplayer scenarios, the recommended approach is **direct device access**. Each player script finds and stores a reference to its specific CapturyInput device based on the device's usage tag (e.g., `Player1`, `Player2`).
 
-This approach is similar to the above, but rather than using the map directly, instantiates it to ensure that it will only be tied to one player's actions. You can put this same script on each player object. 
-
+This approach is simpler and more reliable than binding overrides, as each player maintains a direct reference to their own device and reads from it directly.
 ```csharp
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 public class MultiplayerTrackingExample : MonoBehaviour
 {
-    // assign Input Action Asset in the Inspector
-    public InputActionAsset inputActions;
     public int playerNumber;
-
-    private InputAction isWalkingAction;
-    private InputAction walkSpeedAction;
-    private InputAction weightShiftLeftAction;
-
-    void Awake()
+    private CapturyInput myDevice;
+    
+    void Start()
     {
-        instancedActions = Instantiate(inputActions);
-
-        // must be in AWAKE!
-        // use instanced asset for maps
-        var footMap = instancedActions.FindActionMap("Foot");
-        var torsoMap = instancedActions.FindActionMap("Torso");
-
-        // find specific actions
-        isWalkingAction = footMap.FindAction("IsWalking");
-        walkSpeedAction = footMap.FindAction("WalkSpeed");
-        weightShiftLeftAction = torsoMap.FindAction("WeightShiftLeft");
-
-        // override binding to read from this specific player's device
-        // format: <DeviceType>{Usage}/controlPath
-        isWalkingAction.ApplyBindingOverride($"<CapturyInput>{{Player{playerNumber}}}/isWalkingAction");
-        walkSpeedAction.ApplyBindingOverride($"<CapturyInput>{{Player{playerNumber}}}/walkSpeedAction");
-        weightShiftLeftAction.ApplyBindingOverride($"<CapturyInput>{{Player{playerNumber}}}/weightShiftLeftAction");
+        FindMyDevice();
     }
-
-    void OnEnable()
+    
+    private void FindMyDevice()
     {
-        // enable the actions
-        isWalkingAction.Enable();
-        walkSpeedAction.Enable();
-        weightShiftLeftAction.Enable();
-
-        isWalkingAction.performed += OnWalk;
-        weightShiftLeftAction.performed += OnWeightShiftLeft;
-    }
-
-    void OnEnable()
-    {
-        // disable the actions
-        isWalkingAction.Disable();
-        walkSpeedAction.Disable();
-        weightShiftLeftAction.Disable();
-
-        isWalkingAction.performed -= OnWalk;
-        weightShiftLeftAction.performed -= OnWeightShiftLeft;
-    }
-
-    void OnDestroy()
-    {
-        // clean up instanced action asset
-        if (instancedActions != null)
+        foreach (var device in InputSystem.devices)
         {
-            instancedActions.Disable();
-            Destroy(instancedActions);
+            if (device is CapturyInput capturyDevice)
+            {
+                // check if this device has the usage we're looking for
+                bool isMyDevice = false;
+                foreach (var usage in device.usages)
+                {
+                    if (usage == $"Player{playerNumber}")
+                    {
+                        isMyDevice = true;
+                        break;
+                    }
+                }
+                
+                if (isMyDevice)
+                {
+                    myDevice = capturyDevice;
+                    Debug.Log($"Player {playerNumber}: Found my device - {myDevice.name}");
+                    return;
+                }
+            }
         }
+        
+        Debug.LogWarning($"Player {playerNumber}: Could not find device with usage 'Player{playerNumber}'");
     }
-
-    void OnWalk(InputAction.CallbackContext ctx)
+    
+    void Update()
     {
-        float walkSpeed = walkSpeedAction.ReadValue<float>();
-        Debug.Log($"Player {playerNumber}: Walking at {speed} m/s");
-    }
-
-    void OnWeightShift(InputAction.CallbackContext ctx)
-    {
-        Debug.Log($"Player {playerNumber}: Weight shifted left");
+        // if device not found yet, retry periodically
+        if (myDevice == null)
+        {
+            if (Time.frameCount % 60 == 0)
+            {
+                FindMyDevice();
+            }
+            return;
+        }
+        
+        // read values directly from the device
+        bool isWalking = myDevice.isWalking.isPressed;
+        float walkSpeed = myDevice.walkSpeed.ReadValue();
+        
+        // check for button state changes
+        if (myDevice.weightShiftLeft.wasPressedThisFrame)
+        {
+            Debug.Log($"Player {playerNumber}: Weight shifted left");
+        }
+        
+        if (myDevice.weightShiftRight.wasPressedThisFrame)
+        {
+            Debug.Log($"Player {playerNumber}: Weight shifted right");
+        }
+        
+        // check continuous values
+        if (isWalking && Time.frameCount % 60 == 0)
+        {
+            Debug.Log($"Player {playerNumber}: Walking at {walkSpeed} m/s");
+        }
     }
 }
 ```
 
-As long as you've set up your awake to use an instanced version of the asset and override the bindings to work with the correct device, you can then use the actions as you would with any other InputActionAsset!
+**How it works:**
+1. Each player script searches for a CapturyInput device with the matching `Player{N}` usage
+2. Once found, the script stores a direct reference to that specific device
+3. All tracking data is read directly from the device using `.ReadValue()` or `.isPressed`
+4. Button-like controls (e.g., `weightShiftLeft`) support state checks like `wasPressedThisFrame`
+5. If the device isn't found immediately (e.g., skeleton spawns late), the script retries every 60 frames
 
-There are also other solutions, but that may require more setup. You can create a new InputActionAsset with different maps having different players, and you would rebind the same (or different, depending on your controls!) actions to different input devices. The format for the multiplayer bindings is `<DeviceType>{Usage}/controlPath`
+**Alternative Approach - InputAction Binding Overrides:**
+
+If you prefer to use InputActions, you can instance your InputActionAsset and apply binding overrides. However, this approach can be more complex:
+```csharp
+// in Awake():
+instancedActions = Instantiate(inputActions);
+var footMap = instancedActions.FindActionMap("Foot");
+isWalkingAction = footMap.FindAction("IsWalking");
+
+// override binding to specific player's device
+// format: <DeviceType>/{Usage}/controlPath
+isWalkingAction.ApplyBindingOverride($"<CapturyInput>/{{Player{playerNumber}}}/isWalking");
+```
+
+For most use cases, **direct device access is recommended** as it's more straightforward and avoids potential binding resolution issues in multiplayer scenarios.
 
 ---
 

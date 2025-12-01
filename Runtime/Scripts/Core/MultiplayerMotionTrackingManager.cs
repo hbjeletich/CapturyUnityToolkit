@@ -553,7 +553,7 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
             }
         }
 
-        if (skeletonData.inputDevice != null && !dontDestroyOnLoad)
+        if (skeletonData.inputDevice != null)
         {
             InputSystem.RemoveDevice(skeletonData.inputDevice);
         }

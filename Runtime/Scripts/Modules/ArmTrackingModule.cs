@@ -34,7 +34,7 @@ public class ArmTrackingModule : MotionTrackingModule
 
     #region Initialize, Calibrate, Joints
 
-    public override void Initialize(MotionTrackingManager manager)
+    public override void Initialize(IMotionTrackingManager manager)
     {
         base.Initialize(manager);
         Debug.Log($"ArmsTrackingModule: Initialized with manager. Config present: {manager?.Config != null}");

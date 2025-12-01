@@ -33,7 +33,7 @@ public class TorsoTrackingModule : MotionTrackingModule
     public float WholeBodyMovementThreshold => manager?.Config?.wholeBodyMovementThreshold ?? 0.8f;
 
     #region Initialize, Calibrate, Joints
-    public override void Initialize(MotionTrackingManager manager)
+    public override void Initialize(IMotionTrackingManager manager)
     {
         base.Initialize(manager);
         Debug.Log($"TorsoTrackingModule: Initialized with manager. Config present: {manager?.Config != null}");

@@ -5,7 +5,7 @@ using Captury;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.LowLevel;
 
-public class MotionTrackingManager : MonoBehaviour
+public class MotionTrackingManager : MonoBehaviour, IMotionTrackingManager
 {
     [Header("Configuration")]
     [SerializeField] private MotionTrackingConfiguration config;

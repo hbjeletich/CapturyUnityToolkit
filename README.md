@@ -16,6 +16,7 @@ Unity package for motion capture tracking using Captury and Unity's Input System
 - **Head Tracking** - Position, rotation, nod/shake gesture detection
 - **Balance Tracking** - Center of mass position and velocity, lateral sway, anterior/posterior sway
 - **Configurable** - ScriptableObject-based configuration system
+- **Multiplayer Support** - Supports multiple captury skeletons with instanced input action assets
 
 ---
 
@@ -49,13 +50,24 @@ Add this line to your `Packages/manifest.json`:
 
 ### 1. Scene Setup
 
-Add these components to a GameObject in your scene:
+Use the BaseScene for fastest setup for singleplayer. 
+
+For existing scenes or starting from scratch, add these components to a GameObject in your scene:
 
 | Component | Source | Purpose |
 |-----------|--------|---------|
 | `CapturyNetworkPlugin` | Captury Plugin | Connects to CapturyLive |
 | `CapturyInputManager` | This Package | Registers input device |
 | `MotionTrackingManager` | This Package | Main tracking manager |
+
+If you're doing multiplayer, the components are slightly different:
+
+| Component | Source | Purpose |
+|-----------|--------|---------|
+| `CapturyNetworkPlugin` | Captury Plugin | Connects to CapturyLive |
+| `MultiplayerTrackingManager` | This Package | Main tracking manager, handles input device registration |
+
+
 
 ### 2. Configure Captury Connection
 
@@ -77,9 +89,11 @@ On the `CapturyNetworkPlugin` component:
 
 ### 4. Assign Configuration
 
-Drag your configuration asset to the **Config** field on `MotionTrackingManager`.
+Drag your configuration asset to the **Config** field on `MotionTrackingManager` or `MultiplayerTrackingManager`.
 
-### 5. Access Tracking Data
+### 5. Access Tracking Data -- Singleplayer
+
+To directly find input actions from the input device:
 
 There are two ways to access tracking data. You can access it directly using the input device, or by using the provided Input Action Asset. 
 
@@ -89,7 +103,7 @@ There are two ways to access tracking data. You can access it directly using the
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-public class TrackingExample : MonoBehaviour
+public class DirectInputTrackingExample : MonoBehaviour
 {
     void Update()
     {
@@ -162,38 +176,190 @@ public class TrackingExample : MonoBehaviour
         footLowerAction.Enable();
     }
 
-    private void OnDisable()
+You can also use an `InputActionAsset`, or the MotionTracking one created for you already:
+
+```csharp
+using UnityEngine;
+using UnityEngine.InputSystem;
+
+public class InputActionAssetTrackingExample : MonoBehaviour
+{
+    // assign Input Action Asset in the Inspector
+    public InputActionAsset inputActions;
+
+    private InputAction isWalkingAction;
+    private InputAction walkSpeedAction;
+    private InputAction weightShiftLeftAction;
+
+    void Awake()
     {
-        weightShiftXAction.Disable();
-        footRaiseAction.Disable();
-        footLowerAction.Disable();
+        // must be in AWAKE!
+        // assuming you're using the given MotionTracking asset, action maps are separated by module
+        var footMap = inputActions.FindActionMap("Foot");
+        var torsoMap = inputActions.FindActionMap("Torso");
+
+        // find specific actions
+        isWalkingAction = footMap.FindAction("IsWalking");
+        walkSpeedAction = footMap.FindAction("WalkSpeed");
+        weightShiftLeftAction = torsoMap.FindAction("WeightShiftLeft");
     }
 
-    private void OnFootRaise(InputAction.CallbackContext ctx)
+    void OnEnable()
     {
-        // this is where you put logic for what happens when you raise your foot
-        Debug.Log("Foot raise detected!");
+        // enable the actions
+        isWalkingAction.Enable();
+        walkSpeedAction.Enable();
+        weightShiftLeftAction.Enable();
+
+        isWalkingAction.performed += OnWalk;
+        weightShiftLeftAction.performed += OnWeightShiftLeft;
     }
 
-    private void OnFootLower(InputAction.CallbackContext ctx)
+    void OnEnable()
     {
-        // this is where you put logic for what happens when you raise your foot
-        Debug.Log("Foot lower detected!");
+        // disable the actions
+        isWalkingAction.Disable();
+        walkSpeedAction.Disable();
+        weightShiftLeftAction.Disable();
+
+        isWalkingAction.performed -= OnWalk;
+        weightShiftLeftAction.performed -= OnWeightShiftLeft;
     }
 
-    void Update()
+    void OnWalk(InputAction.CallbackContext ctx)
     {
-        // read the value of the action and save it to a float
-        float weightShift = weightShiftXAction.ReadValue<float>();
+        float walkSpeed = walkSpeedAction.ReadValue<float>();
+        Debug.Log($"Walking at {speed} m/s");
+    }
 
-        // now you can do whatever you want with that number!
-        Debug.Log($"Weight Shift X Value: {weightShift}");
+    void OnWeightShift(InputAction.CallbackContext ctx)
+    {
+        Debug.Log("Weight shifted left");
     }
 }
 ```
+
+Though the setup for this is a little longer, it is a much better, more modular way to call the actions, especially if you have more complex control schemes. 
+
+### 6. Access Tracking Data -- Multiplayer
+
+For multiplayer scenarios, the recommended approach is **direct device access**. Each player script finds and stores a reference to its specific CapturyInput device based on the device's usage tag (e.g., `Player1`, `Player2`).
+
+This approach is simpler and more reliable than binding overrides, as each player maintains a direct reference to their own device and reads from it directly.
+```csharp
+using UnityEngine;
+using UnityEngine.InputSystem;
+
+public class MultiplayerTrackingExample : MonoBehaviour
+{
+    public int playerNumber;
+    private CapturyInput myDevice;
+    
+    void Start()
+    {
+        FindMyDevice();
+    }
+    
+    private void FindMyDevice()
+    {
+        foreach (var device in InputSystem.devices)
+        {
+            if (device is CapturyInput capturyDevice)
+            {
+                // check if this device has the usage we're looking for
+                bool isMyDevice = false;
+                foreach (var usage in device.usages)
+                {
+                    if (usage == $"Player{playerNumber}")
+                    {
+                        isMyDevice = true;
+                        break;
+                    }
+                }
+                
+                if (isMyDevice)
+                {
+                    myDevice = capturyDevice;
+                    Debug.Log($"Player {playerNumber}: Found my device - {myDevice.name}");
+                    return;
+                }
+            }
+        }
+        
+        Debug.LogWarning($"Player {playerNumber}: Could not find device with usage 'Player{playerNumber}'");
+    }
+    
+    void Update()
+    {
+        // if device not found yet, retry periodically
+        if (myDevice == null)
+        {
+            if (Time.frameCount % 60 == 0)
+            {
+                FindMyDevice();
+            }
+            return;
+        }
+        
+        // read values directly from the device
+        bool isWalking = myDevice.isWalking.isPressed;
+        float walkSpeed = myDevice.walkSpeed.ReadValue();
+        
+        // check for button state changes
+        if (myDevice.weightShiftLeft.wasPressedThisFrame)
+        {
+            Debug.Log($"Player {playerNumber}: Weight shifted left");
+        }
+        
+        if (myDevice.weightShiftRight.wasPressedThisFrame)
+        {
+            Debug.Log($"Player {playerNumber}: Weight shifted right");
+        }
+        
+        // check continuous values
+        if (isWalking && Time.frameCount % 60 == 0)
+        {
+            Debug.Log($"Player {playerNumber}: Walking at {walkSpeed} m/s");
+        }
+    }
+}
+```
+
+**How it works:**
+1. Each player script searches for a CapturyInput device with the matching `Player{N}` usage
+2. Once found, the script stores a direct reference to that specific device
+3. All tracking data is read directly from the device using `.ReadValue()` or `.isPressed`
+4. Button-like controls (e.g., `weightShiftLeft`) support state checks like `wasPressedThisFrame`
+5. If the device isn't found immediately (e.g., skeleton spawns late), the script retries every 60 frames
+
+**Alternative Approach - InputAction Binding Overrides:**
+
+If you prefer to use InputActions, you can instance your InputActionAsset and apply binding overrides. However, this approach can be more complex:
+```csharp
+// in Awake():
+instancedActions = Instantiate(inputActions);
+var footMap = instancedActions.FindActionMap("Foot");
+isWalkingAction = footMap.FindAction("IsWalking");
+
+// override binding to specific player's device
+// format: <DeviceType>/{Usage}/controlPath
+isWalkingAction.ApplyBindingOverride($"<CapturyInput>/{{Player{playerNumber}}}/isWalking");
+```
+
+For most use cases, **direct device access is recommended** as it's more straightforward and avoids potential binding resolution issues in multiplayer scenarios.
+
 ---
 
 ## Configuration Options
+
+### Motion Tracking Manager
+- **Modular System** - Use what you need, don't use what you don't
+- **Configuration Scriptables** - Create your own configurations and swap between them in editor or during runtime
+- **Calibration Setup** - Automatically or manually calibrate your modules, setting your own delays and calling the calibrate method when necessary
+
+### Multiplayer Manager
+- **Maximum Players** - Set a number of max players accepted
+- **Calibration Preferences** - Decide if calibration will happen automatically, and the delay (in seconds) between calibrating skeletons
 
 ### Torso Module
 - **Weight Shift Threshold** - Distance required to trigger weight shift detection
@@ -234,17 +400,22 @@ public class TrackingExample : MonoBehaviour
 
 ## Joint Name Configuration
 
-Configure joint names in your configuration asset to match your skeleton. You can upload your own skeleton, but by default it assumes the names of the model that comes with the Captury plugin. 
+Configure joint names in your configuration asset to match your skeleton. You can upload your own skeleton, but by default it assumes the names of the model that comes with the Captury plugin. Note that **each joint can only be accessed by one module at a time**.
 
 | Module | Joint | Default Name |
 |--------|-------|--------------|
 | Torso | Pelvis | `Hips` |
+| Balance | Bottom of Spine | `Spine1` |
 | Torso | Top of Spine | `Spine4` |
 | Head | Head | `Head` |
 | Arms | Left Shoulder | `LeftShoulder` |
 | Arms | Right Shoulder | `RightShoulder` |
+| Balance | Left Forearm | `LeftForearm` |
+| Balance | Right Forearm | `RightForearm` |
 | Arms | Left Hand | `LeftHand` |
 | Arms | Right Hand | `RightHand` |
+| Balance | Left Leg | `LeftLeg` |
+| Balance | Right Leg | `RightLeg` |
 | Feet | Left Foot | `LeftFoot` |
 | Feet | Right Foot | `RightFoot` |
 | Balance | Bottom of Spine | `Spine1` |
@@ -282,6 +453,9 @@ This package includes the **Captury Unity Plugin**:
 - Walk detection and gait analysis
 - Input System integration
 
-### 1.1.0
-- Added balance tracking
-- Fixed a bug with whole body movement
+### 1.1.0 & 1.1.1
+- Added balance tracking support
+- Fixed foot tracking relative position bug
+
+### 1.2.0
+- Added Multiplayer support (multiple skeletons tracked by the same system)

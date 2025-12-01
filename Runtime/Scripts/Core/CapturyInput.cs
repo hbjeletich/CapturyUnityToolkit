@@ -10,6 +10,10 @@ using UnityEngine.InputSystem.Utilities;
 public struct CapturyInputState : IInputStateTypeInfo
 {
     public FourCC format => new FourCC('C', 'A', 'P', 'T');
+    // PLAYER IDENTIFICATION
+    [InputControl(layout = "Integer")]
+    public int playerIndex;
+
 
     // TORSO TRACKING CONTROLS
     [InputControl(layout = "Button")]
@@ -147,6 +151,8 @@ public struct CapturyInputState : IInputStateTypeInfo
 [InputControlLayout(stateType = typeof(CapturyInputState), displayName = "Captury Input")]
 public class CapturyInput : InputDevice
 {
+    [InputControl(layout = "Integer", displayName = "Player Index")]
+    public IntegerControl playerIndex { get; private set; }
     // TORSO CONTROLS
     [InputControl(layout = "Button", displayName = "Is Bent Over")]
     public ButtonControl isBentOver { get; private set; }
@@ -282,6 +288,8 @@ public class CapturyInput : InputDevice
     protected override void FinishSetup()
     {
         base.FinishSetup();
+
+        playerIndex = GetChildControl<IntegerControl>("playerIndex");
 
         // torso controls
         isBentOver = GetChildControl<ButtonControl>("isBentOver");

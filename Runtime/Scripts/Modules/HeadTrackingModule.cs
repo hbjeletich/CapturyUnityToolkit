@@ -40,7 +40,7 @@ public class HeadTrackingModule : MotionTrackingModule
 
     #region Initialize, Calibrate, Joints
 
-    public override void Initialize(MotionTrackingManager manager)
+    public override void Initialize(IMotionTrackingManager manager)
     {
         base.Initialize(manager);
         Debug.Log($"HeadTrackingModule: Initialized with manager. Config present: {manager?.Config != null}");

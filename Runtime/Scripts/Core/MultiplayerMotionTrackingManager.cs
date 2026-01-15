@@ -182,8 +182,6 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
             return;
         }
 
-        // CRITICAL: Subscribe to event IMMEDIATELY before queuing
-        // The event can fire before Update() processes the queue!
         skeleton.OnSkeletonSetupComplete += OnIndividualSkeletonSetupComplete;
 
         lock (skeletonQueueLock)
@@ -276,8 +274,7 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
         trackedSkeletons.Add(skeleton.id, skeletonData);
 
         // Note: Event subscription happens in OnSkeletonFound() to ensure we don't miss it
-        
-        // Check if skeleton is already set up (event may have fired before we processed queue)
+
         if (skeleton.joints != null && skeleton.joints.Length > 0)
         {
             if (enableDebugLogging)
@@ -352,7 +349,6 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
 
     private void CreateInputDevice(SkeletonTrackingData skeletonData)
     {
-        // Create device using the layout name (not a custom device name)
         skeletonData.inputDevice = InputSystem.AddDevice<CapturyInput>();
 
         if (skeletonData.inputDevice == null)
@@ -361,7 +357,7 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
             return;
         }
 
-        // Set the device usage - this is how you differentiate players in your Input Action Asset
+        // Set the device usage - this is how you differentiate players in Input Action Asset
         InputSystem.SetDeviceUsage(skeletonData.inputDevice, $"Player{skeletonData.playerNumber}");
 
         if (enableDebugLogging)
@@ -524,7 +520,6 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
     {
         if (skeleton != null)
         {
-            // Unsubscribe from event to prevent memory leaks
             skeleton.OnSkeletonSetupComplete -= OnIndividualSkeletonSetupComplete;
         }
         CleanupSkeleton(skeleton?.id ?? -1);

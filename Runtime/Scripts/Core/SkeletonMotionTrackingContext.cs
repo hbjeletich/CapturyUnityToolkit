@@ -17,7 +17,7 @@ public class SkeletonMotionTrackingContext : IMotionTrackingManager
 
     public Transform GetJointByName(string jointName)
     {
-        // route call to the multiplayer manager with the specific skeleton ID
+        // call to the multiplayer manager with the specific skeleton ID
         return multiplayerManager?.GetJointByName(skeletonId, jointName);
     }
 }

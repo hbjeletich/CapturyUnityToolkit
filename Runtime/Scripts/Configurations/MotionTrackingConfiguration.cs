@@ -17,8 +17,6 @@ public class MotionTrackingConfiguration : ScriptableObject
     [Tooltip("Number of frames to average during calibration")]
     public int calibrationFrames = 30;
 
-    [Header("Modules")]
-    [Tooltip("Add module configurations here. Each module defines its own settings, joint requirements, and factory method.")]
     [SerializeReference]
     public List<ModuleConfiguration> modules = new List<ModuleConfiguration>();
 

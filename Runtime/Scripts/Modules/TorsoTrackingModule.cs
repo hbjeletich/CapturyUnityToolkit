@@ -3,136 +3,101 @@ using UnityEngine.InputSystem.LowLevel;
 
 public class TorsoTrackingModule : MotionTrackingModule
 {
+    #region Calibration Data
+
+    [System.Serializable]
+    public class TorsoCalibrationSnapshot : CalibrationSnapshot
+    {
+        public Vector3 neutralPelvisPosition;
+        public Vector3 neutralPelvisRotation;
+        public Vector3 neutralSpinePosition;
+        public Vector3 neutralSpineToPelvisOffset;
+
+        public override CalibrationSnapshot Clone()
+        {
+            return new TorsoCalibrationSnapshot
+            {
+                timestamp = timestamp,
+                neutralPelvisPosition = neutralPelvisPosition,
+                neutralPelvisRotation = neutralPelvisRotation,
+                neutralSpinePosition = neutralSpinePosition,
+                neutralSpineToPelvisOffset = neutralSpineToPelvisOffset
+            };
+        }
+    }
+
+    #endregion
+
+    #region Variables
+
     // internal states
     private bool isShiftingLeft = false;
     private bool isShiftingRight = false;
     private bool isBentOver = false;
 
-    // tracking both pelvis and spine
-    private Vector3 neutralPelvisPosition = Vector3.zero;
-    private Vector3 neutralPelvisRotation = Vector3.zero;
-    private Vector3 neutralSpinePosition = Vector3.zero;
-    private Vector3 neutralSpineToePelvisOffset = Vector3.zero; // the neutral offset between spine and pelvis
+    // calibration access
+    private TorsoModuleConfiguration TorsoConfig => GetModuleConfig() as TorsoModuleConfiguration;
+    private TorsoCalibrationSnapshot TorsoCalibration => CurrentCalibration as TorsoCalibrationSnapshot;
 
-    private Transform trackedPelvis = null;
-    private Transform trackedSpine = null;
+    // config values with fallbacks
+    public bool IsShiftTracked => TorsoConfig?.isShiftTracked ?? false;
+    public bool IsBendTracked => TorsoConfig?.isBendTracked ?? false;
+    public float WeightShiftThreshold => TorsoConfig?.weightShiftThreshold ?? 0.15f;
+    public float NeutralZoneWidth => TorsoConfig?.neutralZoneWidth ?? 0.05f;
+    public float BentOverAngleThreshold => TorsoConfig?.bentOverAngleThreshold ?? 30f;
+    public float WholeBodyMovementThreshold => TorsoConfig?.wholeBodyMovementThreshold ?? 3f;
 
-    // get from config!
-    public override bool IsEnabled => manager?.Config?.enableTorsoModule ?? false;
-    public override float Sensitivity => manager?.Config?.torsoSensitivity ?? 1.0f;
-    public override bool DebugMode => manager?.Config?.torsoDebugMode ?? false;
+    #endregion
 
-    public bool IsShiftTracked => manager?.Config?.isShiftTracked ?? false;
-    //public bool IsBalanceTracked => manager?.Config?.isBalanceTracked ?? false;
-    public bool IsBendTracked => manager?.Config?.isBendTracked ?? false;
+    #region Base Class Implementation
 
-    public float WeightShiftThreshold => manager?.Config?.weightShiftThreshold ?? 0.15f;
-    public float NeutralZoneWidth => manager?.Config?.neutralZoneWidth ?? 0.05f;
-    //public float BalanceThreshold => manager?.Config?.balanceThreshold ?? 0.1f;
-    public float BentOverAngleThreshold => manager?.Config?.bentOverAngleThreshold ?? 30f;
-    public float WholeBodyMovementThreshold => manager?.Config?.wholeBodyMovementThreshold ?? 0.8f;
-
-    #region Initialize, Calibrate, Joints
-    public override void Initialize(IMotionTrackingManager manager)
+    public override ModuleConfiguration GetModuleConfig()
     {
-        base.Initialize(manager);
-        Debug.Log($"TorsoTrackingModule: Initialized with manager. Config present: {manager?.Config != null}");
-        if (manager?.Config != null)
-        {
-            Debug.Log($"TorsoTrackingModule: Settings - Enabled: {IsEnabled}, Debug: {DebugMode}, " +
-                     $"ShiftTracked: {IsShiftTracked}, BendTracked: {IsBendTracked}");
-        }
+        return manager?.Config?.GetModuleConfig<TorsoModuleConfiguration>();
     }
 
-    public override void Calibrate(Transform[] joints)
+    protected override CalibrationSnapshot CaptureCalibration()
     {
-        Debug.Log("TorsoTrackingModule: Calibrate() called");
-        Transform pelvis = GetPelvisJoint(joints);
-        Transform spine = GetSpineJoint(joints);
+        string pelvisName = TorsoConfig?.pelvisJointName ?? "Hips";
+        string spineName = TorsoConfig?.spineJointName ?? "Spine4";
 
-        if (pelvis != null && spine != null)
+        Transform pelvis = GetJoint(pelvisName);
+        Transform spine = GetJoint(spineName);
+
+        if (pelvis == null || spine == null)
         {
-            trackedPelvis = pelvis;
-            trackedSpine = spine;
-
-            neutralPelvisPosition = pelvis.position;
-            neutralPelvisRotation = pelvis.eulerAngles;
-            neutralSpinePosition = spine.position;
-            neutralSpineToePelvisOffset = neutralSpinePosition - neutralPelvisPosition;
-
-            isCalibrated = true;
-
-            Debug.Log("TorsoTrackingModule: Successfully calibrated! " +
-                     $"Neutral Pelvis: {neutralPelvisPosition:F3}, Neutral Spine: {neutralSpinePosition:F3}, " +
-                     $"Neutral Offset: {neutralSpineToePelvisOffset:F3}");
+            Debug.LogError("TorsoTrackingModule: Missing joints during calibration capture");
+            return null;
         }
-        else
+
+        var snapshot = new TorsoCalibrationSnapshot
         {
-            Debug.LogError($"TorsoTrackingModule: Failed to calibrate - missing joints! " +
-                          $"Pelvis: {pelvis != null}, Spine: {spine != null}");
-            isCalibrated = false;
-        }
-    }
-
-    public override bool HasRequiredJoints(Transform[] joints)
-    {
-        bool hasJoints = GetPelvisJoint(joints) != null && GetSpineJoint(joints) != null;
-        if (DebugMode) Debug.Log($"TorsoTrackingModule: HasRequiredJoints = {hasJoints}");
-        return hasJoints;
-    }
-
-    public override string[] GetRequiredJointNames()
-    {
-        return new string[] {
-            manager?.Config?.pelvisJointName ?? "Hips",
-            manager?.Config?.spineJointName ?? "Spine4"
+            neutralPelvisPosition = pelvis.position,
+            neutralPelvisRotation = pelvis.eulerAngles,
+            neutralSpinePosition = spine.position,
+            neutralSpineToPelvisOffset = spine.position - pelvis.position
         };
+
+        Debug.Log($"TorsoTrackingModule: Captured calibration — " +
+                 $"Pelvis: {snapshot.neutralPelvisPosition:F3}, Spine: {snapshot.neutralSpinePosition:F3}, " +
+                 $"Offset: {snapshot.neutralSpineToPelvisOffset:F3}");
+
+        return snapshot;
     }
 
-    private Transform GetPelvisJoint(Transform[] joints)
+    protected override void OnCalibrationApplied()
     {
-        string pelvisName = manager?.Config?.pelvisJointName ?? "Hips";
-        Transform pelvis = manager?.GetJointByName(pelvisName);
-
-        if (DebugMode)
-        {
-            if (pelvis == null)
-            {
-                Debug.LogWarning($"TorsoTrackingModule: Could not find pelvis joint '{pelvisName}'");
-            }
-            else
-            {
-                Debug.Log($"TorsoTrackingModule: Successfully found pelvis joint '{pelvisName}' at position {pelvis.position}");
-            }
-        }
-
-        return pelvis;
-    }
-
-    private Transform GetSpineJoint(Transform[] joints)
-    {
-        string spineName = manager?.Config?.spineJointName ?? "Spine4";
-        Transform spine = manager?.GetJointByName(spineName);
-
-        if (DebugMode)
-        {
-            if (spine == null)
-            {
-                Debug.LogWarning($"TorsoTrackingModule: Could not find spine joint '{spineName}'");
-            }
-            else
-            {
-                Debug.Log($"TorsoTrackingModule: Successfully found spine joint '{spineName}' at position {spine.position}");
-            }
-        }
-
-        return spine;
+        // reset internal state when calibration changes
+        isShiftingLeft = false;
+        isShiftingRight = false;
+        isBentOver = false;
     }
 
     #endregion
-    #region Update Functions
 
-    public override void UpdateTracking(ref CapturyInputState state, Transform[] joints)
+    #region Update
+
+    public override void UpdateTracking(ref CapturyInputState state)
     {
         if (!IsEnabled || !IsCalibrated)
         {
@@ -144,43 +109,47 @@ public class TorsoTrackingModule : MotionTrackingModule
             return;
         }
 
-        if (trackedPelvis == null || trackedSpine == null)
+        string pelvisName = TorsoConfig.pelvisJointName;
+        string spineName = TorsoConfig.spineJointName;
+        Transform pelvis = GetJoint(pelvisName);
+        Transform spine = GetJoint(spineName);
+
+        if (pelvis == null || spine == null)
         {
             if (DebugMode && Time.frameCount % 300 == 0)
-                Debug.Log($"TorsoTrackingModule: Missing tracked joints - Pelvis: {trackedPelvis != null}, Spine: {trackedSpine != null}");
+                Debug.Log($"TorsoTrackingModule: Missing tracked joints — Pelvis: {pelvis != null}, Spine: {spine != null}");
             return;
         }
 
+        var cal = TorsoCalibration;
+
         // calculate relative positions
-        Vector3 currentPelvisPosition = trackedPelvis.position;
-        Vector3 currentSpinePosition = trackedSpine.position;
+        Vector3 currentPelvisPosition = pelvis.position;
+        Vector3 currentSpinePosition = spine.position;
 
-        Vector3 pelvisMovement = currentPelvisPosition - neutralPelvisPosition;
-        Vector3 spineMovement = currentSpinePosition - neutralSpinePosition;
+        Vector3 pelvisMovement = currentPelvisPosition - cal.neutralPelvisPosition;
+        Vector3 spineMovement = currentSpinePosition - cal.neutralSpinePosition;
 
-        // calculate the current spine-to-pelvis offset and compare to neutral
+        // current spine-to-pelvis offset vs neutral
         Vector3 currentSpineToPelvisOffset = currentSpinePosition - currentPelvisPosition;
-        Vector3 relativeMovement = currentSpineToPelvisOffset - neutralSpineToePelvisOffset;
+        Vector3 relativeMovement = currentSpineToPelvisOffset - cal.neutralSpineToPelvisOffset;
 
-        // for backwards compatibility, still set pelvisPosition to absolute movement
+        // backwards compat: absolute pelvis movement
         state.pelvisPosition = pelvisMovement;
 
-        // rotation calculations (using pelvis rotation as before)
-        Vector3 currentRotation = trackedPelvis.eulerAngles;
-        Vector3 relativeRotation = NormalizeEulerAngles(currentRotation - neutralPelvisRotation);
+        // rotation
+        Vector3 currentRotation = pelvis.eulerAngles;
+        Vector3 relativeRotation = NormalizeEulerAngles(currentRotation - cal.neutralPelvisRotation);
 
-        // update tracking 
         if (IsShiftTracked)
             UpdateWeightShiftRelative(ref state, pelvisMovement, spineMovement, relativeMovement);
-/*        if (IsBalanceTracked)
-            UpdateBalance(ref state, relativeRotation, currentRotation);*/
+
         if (IsBendTracked)
             UpdateBentOver(ref state, relativeRotation);
     }
 
     private void UpdateWeightShiftRelative(ref CapturyInputState state, Vector3 pelvisMovement, Vector3 spineMovement, Vector3 relativeMovement)
     {
-        // check if this is whole-body movement (both joints moving together)
         float pelvisXMovement = pelvisMovement.x;
         float spineXMovement = spineMovement.x;
 
@@ -197,9 +166,7 @@ public class TorsoTrackingModule : MotionTrackingModule
         {
             shiftAmount = 0f;
             if (DebugMode && Time.frameCount % 60 == 0)
-            {
-                Debug.Log($"TorsoTrackingModule: Whole-body movement detected - ignoring weight shift. Pelvis X: {pelvisXMovement:F3}, Spine X: {spineXMovement:F3}, Ratio: {Mathf.Abs(spineXMovement / pelvisXMovement):F3}");
-            }
+                Debug.Log($"TorsoTrackingModule: Whole-body movement detected — ignoring weight shift");
         }
 
         state.weightShiftX = Mathf.Clamp(shiftAmount / WeightShiftThreshold, -1f, 1f);
@@ -214,9 +181,7 @@ public class TorsoTrackingModule : MotionTrackingModule
             state.weightShiftRight = 0.0f;
 
             if (DebugMode)
-                Debug.Log($"TorsoTrackingModule: WEIGHT SHIFT LEFT detected! " +
-                         $"Relative X: {relativeMovement.x:F3}, Adjusted: {shiftAmount:F3}, " +
-                         $"WholeBody: {isWholeBodyMovement}");
+                Debug.Log($"TorsoTrackingModule: WEIGHT SHIFT LEFT — Relative X: {relativeMovement.x:F3}, Adjusted: {shiftAmount:F3}");
         }
         else if (shiftAmount > NeutralZoneWidth && !isShiftingRight)
         {
@@ -226,9 +191,7 @@ public class TorsoTrackingModule : MotionTrackingModule
             state.weightShiftLeft = 0.0f;
 
             if (DebugMode)
-                Debug.Log($"TorsoTrackingModule: WEIGHT SHIFT RIGHT detected! " +
-                         $"Relative X: {relativeMovement.x:F3}, Adjusted: {shiftAmount:F3}, " +
-                         $"WholeBody: {isWholeBodyMovement}");
+                Debug.Log($"TorsoTrackingModule: WEIGHT SHIFT RIGHT — Relative X: {relativeMovement.x:F3}, Adjusted: {shiftAmount:F3}");
         }
         else if (isInNeutralZone && (isShiftingLeft || isShiftingRight))
         {
@@ -238,8 +201,7 @@ public class TorsoTrackingModule : MotionTrackingModule
             state.weightShiftRight = 0.0f;
 
             if (DebugMode)
-                Debug.Log($"TorsoTrackingModule: Weight returned to NEUTRAL. " +
-                         $"Relative X: {relativeMovement.x:F3}, Adjusted: {shiftAmount:F3}");
+                Debug.Log($"TorsoTrackingModule: Weight returned to NEUTRAL");
         }
         else
         {
@@ -257,35 +219,14 @@ public class TorsoTrackingModule : MotionTrackingModule
         state.isUpright = currentlyBentOver ? 0.0f : 1.0f;
 
         if (DebugMode && (xRotationDiff > BentOverAngleThreshold * 0.7f || Time.frameCount % 120 == 0))
-        {
             Debug.Log($"BentOver: XRotDiff={xRotationDiff:F1}, Threshold={BentOverAngleThreshold:F1}, BentOver={currentlyBentOver}");
-        }
 
         if (currentlyBentOver != isBentOver)
         {
             isBentOver = currentlyBentOver;
             if (DebugMode)
-                Debug.Log($"TorsoTrackingModule: Posture changed to {(isBentOver ? "BENT OVER" : "UPRIGHT")} " +
-                         $"(X rotation diff: {xRotationDiff:F1} degrees)");
+                Debug.Log($"TorsoTrackingModule: Posture changed to {(isBentOver ? "BENT OVER" : "UPRIGHT")}");
         }
-    }
-
-    #endregion
-    #region Helper Functions
-
-    private Vector3 NormalizeEulerAngles(Vector3 angles)
-    {
-        angles.x = NormalizeAngle(angles.x);
-        angles.y = NormalizeAngle(angles.y);
-        angles.z = NormalizeAngle(angles.z);
-        return angles;
-    }
-
-    private float NormalizeAngle(float angle)
-    {
-        while (angle > 180f) angle -= 360f;
-        while (angle < -180f) angle += 360f;
-        return angle;
     }
 
     #endregion

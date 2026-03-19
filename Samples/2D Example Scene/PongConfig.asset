@@ -18,6 +18,7 @@ MonoBehaviour:
   calibrationFrames: 30
   modules:
   - rid: 5667218725816500298
+  - rid: 5667218726784335947
   references:
     version: 2
     RefIds:
@@ -37,3 +38,18 @@ MonoBehaviour:
         headRightThreshold: 20
         headJointName: Head
         neckJointName: Neck
+    - rid: 5667218726784335947
+      type: {class: ArmModuleConfiguration, ns: , asm: CapturyToolkit.Runtime}
+      data:
+        enabled: 1
+        sensitivity: 1
+        debugMode: 1
+        isHandPositionTracked: 1
+        useRelativeHandPosition: 1
+        isHandRaiseTracked: 1
+        handRaiseThreshold: 0.3
+        handRaiseMinHeight: 0.1
+        leftHandJointName: LeftHand
+        rightHandJointName: RightHand
+        leftShoulderJointName: LeftShoulder
+        rightShoulderJointName: RightShoulder

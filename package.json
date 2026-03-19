@@ -7,6 +7,18 @@
   "dependencies": {
     "com.unity.inputsystem": "1.4.0"
   },
+  "samples": [
+    {
+      "displayName": "UI Scene",
+      "description": "Motion tracking UI panel. Requires TextMeshPro.",
+      "path": "Samples~/UIScene"
+    },
+    {
+      "displayName": "2D Example Scene (Pong)",
+      "description": "2D pong game controlled via motion tracking. Requires TextMeshPro and URP.",
+      "path": "Samples~/2DExampleScene"
+    }
+  ],
   "keywords": [
     "motion capture",
     "tracking",

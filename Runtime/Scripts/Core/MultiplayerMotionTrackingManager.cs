@@ -30,20 +30,14 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
         public int playerNumber;
         public string skeletonName;
         public string playerLabel;
-        
+
         public Dictionary<string, Transform> joints;
         public List<MotionTrackingModule> modules;
         public CapturyInput inputDevice;
-        public SkeletonMotionTrackingContext context;  // Per-skeleton context for modules
-        
+        public SkeletonMotionTrackingContext context;
+
         public bool isCalibrated;
         public Coroutine calibrationCoroutine;
-        
-        public TorsoTrackingModule torsoModule;
-        public FootTrackingModule footModule;
-        public ArmTrackingModule armsModule;
-        public HeadTrackingModule headModule;
-        public BalanceTrackingModule balanceModule;
 
         public SkeletonTrackingData(int capturyId, string skeletonName, int playerNumber)
         {
@@ -51,7 +45,7 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
             this.skeletonName = skeletonName;
             this.playerNumber = playerNumber;
             this.playerLabel = $"Player {playerNumber}";
-            
+
             joints = new Dictionary<string, Transform>();
             modules = new List<MotionTrackingModule>();
             isCalibrated = false;
@@ -63,7 +57,7 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
     #region Private Variables
 
     private CapturyNetworkPlugin networkPlugin;
-    
+
     private Dictionary<int, SkeletonTrackingData> trackedSkeletons = new Dictionary<int, SkeletonTrackingData>();
 
     private readonly object skeletonQueueLock = new object();
@@ -92,7 +86,6 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
         SetupSingleton();
         ValidateConfiguration();
     }
-
 
     void Start()
     {
@@ -145,7 +138,8 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
         }
 
         if (enableDebugLogging)
-            Debug.Log($"MultiplayerMotionTrackingManager: Loaded configuration '{config.configurationName}'");
+            Debug.Log($"MultiplayerMotionTrackingManager: Loaded configuration '{config.configurationName}' " +
+                     $"with {config.modules.Count} module config(s)");
     }
 
     private void InitializeCapturyConnection()
@@ -190,7 +184,7 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
         }
 
         if (enableDebugLogging)
-            Debug.Log($"MultiplayerMotionTrackingManager: Queued new skeleton - ID: {skeleton.id}, Name: {skeleton.name}");
+            Debug.Log($"MultiplayerMotionTrackingManager: Queued new skeleton — ID: {skeleton.id}, Name: {skeleton.name}");
     }
 
     private void OnSkeletonLost(CapturySkeleton skeleton)
@@ -201,7 +195,7 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
         }
 
         if (enableDebugLogging)
-            Debug.Log($"MultiplayerMotionTrackingManager: Queued skeleton removal - ID: {skeleton.id}");
+            Debug.Log($"MultiplayerMotionTrackingManager: Queued skeleton removal — ID: {skeleton.id}");
     }
 
     #endregion
@@ -259,7 +253,7 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
         }
 
         if (enableDebugLogging)
-            Debug.Log($"MultiplayerMotionTrackingManager: Processing new skeleton - ID: {skeleton.id}, Name: {skeleton.name}");
+            Debug.Log($"MultiplayerMotionTrackingManager: Processing new skeleton — ID: {skeleton.id}, Name: {skeleton.name}");
 
         int playerNumber = GetNextAvailablePlayerNumber();
         if (playerNumber == -1)
@@ -272,8 +266,6 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
         skeletonData.context = new SkeletonMotionTrackingContext(this, skeleton.id);
 
         trackedSkeletons.Add(skeleton.id, skeletonData);
-
-        // Note: Event subscription happens in OnSkeletonFound() to ensure we don't miss it
 
         if (skeleton.joints != null && skeleton.joints.Length > 0)
         {
@@ -293,13 +285,13 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
         if (!trackedSkeletons.ContainsKey(skeleton.id))
         {
             if (enableDebugLogging)
-                Debug.LogWarning($"MultiplayerMotionTrackingManager: Skeleton {skeleton.id} setup complete but not in tracked list yet (will process when queue is handled)");
+                Debug.LogWarning($"MultiplayerMotionTrackingManager: Skeleton {skeleton.id} setup complete but not in tracked list yet");
             return;
         }
 
         SkeletonTrackingData skeletonData = trackedSkeletons[skeleton.id];
-        
-        // Guard against double-initialization
+
+        // guard against double-initialization
         if (skeletonData.inputDevice != null)
         {
             if (enableDebugLogging)
@@ -311,9 +303,7 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
             Debug.Log($"MultiplayerMotionTrackingManager: Skeleton setup complete for {skeletonData.playerLabel}, building joint lookup...");
 
         BuildJointLookup(skeleton, skeletonData);
-
         CreateInputDevice(skeletonData);
-
         CreateModules(skeletonData);
 
         if (enableDebugLogging)
@@ -328,7 +318,7 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
     private void BuildJointLookup(CapturySkeleton skeleton, SkeletonTrackingData skeletonData)
     {
         skeletonData.joints.Clear();
-        
+
         if (skeleton.Reference == null)
         {
             Debug.LogWarning($"MultiplayerMotionTrackingManager: Skeleton {skeleton.id} has no reference skeleton yet");
@@ -357,14 +347,13 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
             return;
         }
 
-        // Set the device usage - this is how you differentiate players in Input Action Asset
         InputSystem.SetDeviceUsage(skeletonData.inputDevice, $"Player{skeletonData.playerNumber}");
 
         if (enableDebugLogging)
             Debug.Log($"MultiplayerMotionTrackingManager: Created CapturyInput device with usage 'Player{skeletonData.playerNumber}' for {skeletonData.playerLabel}");
     }
 
-
+    // iterates the config's module list and calls each config's CreateModule()
     private void CreateModules(SkeletonTrackingData skeletonData)
     {
         skeletonData.modules.Clear();
@@ -372,49 +361,19 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
         GameObject moduleParent = new GameObject($"{skeletonData.playerLabel}_Modules");
         moduleParent.transform.SetParent(transform);
 
-        if (config.enableTorsoModule)
+        foreach (var moduleConfig in config.modules)
         {
-            GameObject torsoObj = new GameObject("TorsoTrackingModule");
-            torsoObj.transform.SetParent(moduleParent.transform);
-            skeletonData.torsoModule = torsoObj.AddComponent<TorsoTrackingModule>();
-            skeletonData.torsoModule.Initialize(skeletonData.context);
-            skeletonData.modules.Add(skeletonData.torsoModule);
-        }
+            if (moduleConfig == null || !moduleConfig.enabled) continue;
 
-        if (config.enableFootModule)
-        {
-            GameObject footObj = new GameObject("FootTrackingModule");
-            footObj.transform.SetParent(moduleParent.transform);
-            skeletonData.footModule = footObj.AddComponent<FootTrackingModule>();
-            skeletonData.footModule.Initialize(skeletonData.context);
-            skeletonData.modules.Add(skeletonData.footModule);
-        }
+            MotionTrackingModule module = moduleConfig.CreateModule(moduleParent);
+            if (module != null)
+            {
+                module.Initialize(skeletonData.context);
+                skeletonData.modules.Add(module);
 
-        if (config.enableArmsModule)
-        {
-            GameObject armsObj = new GameObject("ArmTrackingModule");
-            armsObj.transform.SetParent(moduleParent.transform);
-            skeletonData.armsModule = armsObj.AddComponent<ArmTrackingModule>();
-            skeletonData.armsModule.Initialize(skeletonData.context);
-            skeletonData.modules.Add(skeletonData.armsModule);
-        }
-
-        if (config.enableHeadModule)
-        {
-            GameObject headObj = new GameObject("HeadTrackingModule");
-            headObj.transform.SetParent(moduleParent.transform);
-            skeletonData.headModule = headObj.AddComponent<HeadTrackingModule>();
-            skeletonData.headModule.Initialize(skeletonData.context);
-            skeletonData.modules.Add(skeletonData.headModule);
-        }
-
-        if (config.enableBalanceModule)
-        {
-            GameObject balanceObj = new GameObject("BalanceTrackingModule");
-            balanceObj.transform.SetParent(moduleParent.transform);
-            skeletonData.balanceModule = balanceObj.AddComponent<BalanceTrackingModule>();
-            skeletonData.balanceModule.Initialize(skeletonData.context);
-            skeletonData.modules.Add(skeletonData.balanceModule);
+                if (enableDebugLogging)
+                    Debug.Log($"MultiplayerMotionTrackingManager: Created {module.GetType().Name} for {skeletonData.playerLabel}");
+            }
         }
 
         if (enableDebugLogging)
@@ -429,14 +388,14 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
     {
         if (!trackedSkeletons.ContainsKey(skeletonId))
         {
-            Debug.LogError($"MultiplayerMotionTrackingManager: Cannot calibrate - skeleton {skeletonId} not found");
+            Debug.LogError($"MultiplayerMotionTrackingManager: Cannot calibrate — skeleton {skeletonId} not found");
             yield break;
         }
 
         SkeletonTrackingData skeletonData = trackedSkeletons[skeletonId];
 
         if (enableDebugLogging)
-            Debug.Log($"MultiplayerMotionTrackingManager: Starting calibration for {skeletonData.playerLabel} in {calibrationDelayPerSkeleton} seconds...");
+            Debug.Log($"MultiplayerMotionTrackingManager: Starting calibration for {skeletonData.playerLabel} in {calibrationDelayPerSkeleton}s...");
 
         yield return new WaitForSeconds(calibrationDelayPerSkeleton);
 
@@ -446,16 +405,14 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
             yield break;
         }
 
-        Transform[] joints = skeletonData.joints.Values.ToArray();
-
         if (enableDebugLogging)
             Debug.Log($"MultiplayerMotionTrackingManager: Calibrating {skeletonData.modules.Count} modules for {skeletonData.playerLabel}...");
 
         foreach (var module in skeletonData.modules)
         {
-            if (module.HasRequiredJoints(joints))
+            if (module.HasRequiredJoints())
             {
-                module.Calibrate(joints);
+                module.Calibrate();
                 if (enableDebugLogging)
                     Debug.Log($"MultiplayerMotionTrackingManager: Calibrated {module.GetType().Name} for {skeletonData.playerLabel}");
             }
@@ -491,22 +448,16 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
         if (!skeletonData.isCalibrated || skeletonData.inputDevice == null)
         {
             if (enableDebugLogging && Time.frameCount % 600 == 0)
-            {
-                Debug.Log($"MultiplayerMotionTrackingManager: {skeletonData.playerLabel} not ready - Calibrated: {skeletonData.isCalibrated}");
-            }
+                Debug.Log($"MultiplayerMotionTrackingManager: {skeletonData.playerLabel} not ready — Calibrated: {skeletonData.isCalibrated}");
             return;
         }
 
         CapturyInputState state = new CapturyInputState();
-        
-        // Set player identification
         state.playerIndex = skeletonData.playerNumber;
-
-        Transform[] joints = skeletonData.joints.Values.ToArray();
 
         foreach (var module in skeletonData.modules)
         {
-            module.UpdateTracking(ref state, joints);
+            module.UpdateTracking(ref state);
         }
 
         InputSystem.QueueStateEvent(skeletonData.inputDevice, state);
@@ -544,7 +495,7 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
         {
             if (module != null && module.gameObject != null)
             {
-                DestroyImmediate(module.gameObject.transform.parent.gameObject); // Destroy module parent
+                DestroyImmediate(module.gameObject.transform.parent.gameObject);
             }
         }
 
@@ -636,6 +587,7 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
 
     #region Public API - Module Access
 
+    // get a specific module type for a player
     public T GetModule<T>(int playerNumber) where T : MotionTrackingModule
     {
         int skeletonId = GetSkeletonIdByPlayerNumber(playerNumber);
@@ -660,6 +612,7 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
         return modules;
     }
 
+    // for built-in modules (still work via generic lookup)
     public BalanceTrackingModule GetBalanceModule(int playerNumber) => GetModule<BalanceTrackingModule>(playerNumber);
     public FootTrackingModule GetFootModule(int playerNumber) => GetModule<FootTrackingModule>(playerNumber);
     public TorsoTrackingModule GetTorsoModule(int playerNumber) => GetModule<TorsoTrackingModule>(playerNumber);
@@ -688,7 +641,7 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
 
     public Transform GetJointByName(string jointName)
     {
-        // old, deprecated
+        // IMotionTrackingManager implementation — deprecated for multiplayer
         return null;
     }
 
@@ -700,7 +653,7 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
     {
         if (!trackedSkeletons.ContainsKey(skeletonId))
         {
-            Debug.LogError($"MultiplayerMotionTrackingManager: Cannot recalibrate - skeleton {skeletonId} not found");
+            Debug.LogError($"MultiplayerMotionTrackingManager: Cannot recalibrate — skeleton {skeletonId} not found");
             return;
         }
 
@@ -715,7 +668,6 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
         }
 
         skeletonData.isCalibrated = false;
-
         skeletonData.calibrationCoroutine = StartCoroutine(CalibrateSkeleton(skeletonId));
     }
 
@@ -728,7 +680,7 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
         }
         else
         {
-            Debug.LogError($"MultiplayerMotionTrackingManager: Cannot recalibrate - player {playerNumber} not found");
+            Debug.LogError($"MultiplayerMotionTrackingManager: Cannot recalibrate — player {playerNumber} not found");
         }
     }
 
@@ -741,6 +693,31 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
         {
             RecalibrateSkeleton(skeletonId);
         }
+    }
+
+    // revert all modules for a player to their previous calibration
+    // returns false if any module had no previous calibration
+    public bool LoadPreviousCalibration(int playerNumber)
+    {
+        int skeletonId = GetSkeletonIdByPlayerNumber(playerNumber);
+        if (skeletonId == -1) return false;
+
+        if (!trackedSkeletons.TryGetValue(skeletonId, out SkeletonTrackingData data)) return false;
+
+        bool allRestored = true;
+        foreach (var module in data.modules)
+        {
+            if (!module.LoadPreviousCalibration())
+            {
+                allRestored = false;
+                Debug.LogWarning($"MultiplayerMotionTrackingManager: {module.GetType().Name} had no previous calibration for {data.playerLabel}");
+            }
+        }
+
+        if (enableDebugLogging)
+            Debug.Log($"MultiplayerMotionTrackingManager: LoadPreviousCalibration for {data.playerLabel} — all restored: {allRestored}");
+
+        return allRestored;
     }
 
     #endregion
@@ -778,7 +755,7 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
         foreach (var skeletonData in oldSkeletons.Values)
         {
             CreateModules(skeletonData);
-            
+
             if (automaticCalibration)
             {
                 StartCoroutine(CalibrateSkeleton(skeletonData.capturyId));
@@ -786,7 +763,7 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
         }
 
         if (enableDebugLogging)
-            Debug.Log($"MultiplayerMotionTrackingManager: Configuration swap complete");
+            Debug.Log("MultiplayerMotionTrackingManager: Configuration swap complete");
     }
 
     #endregion

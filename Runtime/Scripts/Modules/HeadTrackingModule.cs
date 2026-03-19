@@ -1,309 +1,249 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem.LowLevel;
 
 public class HeadTrackingModule : MotionTrackingModule
 {
-    // internal states
+    #region Calibration Data
+
+    [System.Serializable]
+    public class HeadCalibrationSnapshot : CalibrationSnapshot
+    {
+        public Vector3 neutralHeadPosition;
+        public Vector3 neutralNeckPosition;
+        public Vector3 neutralHeadRotation;
+        public Vector3 neutralNeckRotation;
+        public Vector3 neutralHeadToNeckOffset;
+        public Vector3 neutralHeadToNeckRotationOffset;
+
+        public override CalibrationSnapshot Clone()
+        {
+            return new HeadCalibrationSnapshot
+            {
+                timestamp = timestamp,
+                neutralHeadPosition = neutralHeadPosition,
+                neutralNeckPosition = neutralNeckPosition,
+                neutralHeadRotation = neutralHeadRotation,
+                neutralNeckRotation = neutralNeckRotation,
+                neutralHeadToNeckOffset = neutralHeadToNeckOffset,
+                neutralHeadToNeckRotationOffset = neutralHeadToNeckRotationOffset
+            };
+        }
+    }
+
+    #endregion
+
+    #region Variables
+
     private bool isHeadUp = false;
     private bool isHeadDown = false;
     private bool isHeadLeft = false;
     private bool isHeadRight = false;
 
-    // tracking transforms
-    private Vector3 neutralHeadPosition = Vector3.zero;
-    private Vector3 neutralNeckPosition = Vector3.zero;
-    private Vector3 neutralHeadRotation = Vector3.zero;
-    private Vector3 neutralNeckRotation = Vector3.zero;
-    private Vector3 neutralHeadToNeckOffset = Vector3.zero;
-    private Vector3 neutralHeadToNeckRotationOffset = Vector3.zero;
+    // calibration access
+    private HeadModuleConfiguration HeadConfig => GetModuleConfig() as HeadModuleConfiguration;
+    private HeadCalibrationSnapshot HeadCalibration => CurrentCalibration as HeadCalibrationSnapshot;
 
-    private Transform trackedHead = null;
-    private Transform trackedNeck = null;
+    // config values with fallbacks
+    public bool IsHeadPositionTracked => HeadConfig?.isHeadPositionTracked ?? true;
+    public bool IsHeadRotationTracked => HeadConfig?.isHeadRotationTracked ?? true;
+    public bool IsDirectionDetectionEnabled => HeadConfig?.isHeadDirectionEnabled ?? true;
+    public bool UseRelativeHeadPosition => HeadConfig?.useRelativeHeadPosition ?? true;
+    public float HeadUpThreshold => HeadConfig?.headUpThreshold ?? 15f;
+    public float HeadDownThreshold => HeadConfig?.headDownThreshold ?? 15f;
+    public float HeadLeftThreshold => HeadConfig?.headLeftThreshold ?? 20f;
+    public float HeadRightThreshold => HeadConfig?.headRightThreshold ?? 20f;
 
-    // get from config
-    public override bool IsEnabled => manager?.Config?.enableHeadModule ?? false;
-    public override float Sensitivity => manager?.Config?.headSensitivity ?? 1.0f;
-    public override bool DebugMode => manager?.Config?.headDebugMode ?? false;
+    #endregion
 
-    public bool IsHeadPositionTracked => manager?.Config?.isHeadPositionTracked ?? true;
-    public bool IsHeadRotationTracked => manager?.Config?.isHeadRotationTracked ?? true;
-    public bool IsDirectionDetectionEnabled => manager?.Config?.isHeadDirectionEnabled ?? true;
-    public bool UseRelativeHeadPosition => manager?.Config?.useRelativeHeadPosition ?? true;
+    #region Base Class Implementation
 
-    // direction thresholds (in degrees for rotation)
-    public float HeadUpThreshold => manager?.Config?.headUpThreshold ?? 15f;
-    public float HeadDownThreshold => manager?.Config?.headDownThreshold ?? 15f;
-    public float HeadLeftThreshold => manager?.Config?.headLeftThreshold ?? 20f;
-    public float HeadRightThreshold => manager?.Config?.headRightThreshold ?? 20f;
-
-    #region Initialize, Calibrate, Joints
-
-    public override void Initialize(IMotionTrackingManager manager)
+    public override ModuleConfiguration GetModuleConfig()
     {
-        base.Initialize(manager);
-        Debug.Log($"HeadTrackingModule: Initialized with manager. Config present: {manager?.Config != null}");
-        if (manager?.Config != null)
-        {
-            Debug.Log($"HeadTrackingModule: Settings - Enabled: {IsEnabled}, Debug: {DebugMode}, " +
-                     $"DirectionDetection: {IsDirectionDetectionEnabled}");
-        }
+        return manager?.Config?.GetModuleConfig<HeadModuleConfiguration>();
     }
 
-    public override void Calibrate(Transform[] joints)
+    protected override CalibrationSnapshot CaptureCalibration()
     {
-        Debug.Log("HeadTrackingModule: Calibrate() called");
-        Transform head = GetHeadJoint(joints);
-        Transform neck = GetNeckJoint(joints);
+        var cfg = HeadConfig;
+        Transform head = GetJoint(cfg.headJointName);
+        Transform neck = GetJoint(cfg.neckJointName);
 
-        if (head != null && neck != null)
+        if (head == null || neck == null)
         {
-            trackedHead = head;
-            trackedNeck = neck;
-
-            neutralHeadPosition = head.position;
-            neutralNeckPosition = neck.position;
-            neutralHeadRotation = head.eulerAngles;
-            neutralNeckRotation = neck.eulerAngles;
-
-            // calculate and store offsets
-            neutralHeadToNeckOffset = neutralHeadPosition - neutralNeckPosition;
-            neutralHeadToNeckRotationOffset = NormalizeEulerAngles(neutralHeadRotation - neutralNeckRotation);
-
-            isCalibrated = true;
-
-            Debug.Log("HeadTrackingModule: Successfully calibrated! " +
-                     $"Neutral Head: {neutralHeadPosition:F3}, Neutral Neck: {neutralNeckPosition:F3}, " +
-                     $"Neutral Head Rotation: {neutralHeadRotation:F3}, Neutral Neck Rotation: {neutralNeckRotation:F3}, " +
-                     $"Neutral Rotation Offset: {neutralHeadToNeckRotationOffset:F3}");
+            Debug.LogError("HeadTrackingModule: Missing joints during calibration capture");
+            return null;
         }
-        else
+
+        var snapshot = new HeadCalibrationSnapshot
         {
-            Debug.LogError($"HeadTrackingModule: Failed to calibrate - missing joints! " +
-                          $"Head: {head != null}, Neck: {neck != null}");
-            isCalibrated = false;
-        }
-    }
-
-    public override bool HasRequiredJoints(Transform[] joints)
-    {
-        bool hasJoints = GetHeadJoint(joints) != null && GetNeckJoint(joints) != null;
-        if (DebugMode) Debug.Log($"HeadTrackingModule: HasRequiredJoints = {hasJoints}");
-        return hasJoints;
-    }
-
-    public override string[] GetRequiredJointNames()
-    {
-        return new string[] {
-            manager?.Config?.headJointName ?? "Head",
-            manager?.Config?.neckJointName ?? "Neck"
+            neutralHeadPosition = head.position,
+            neutralNeckPosition = neck.position,
+            neutralHeadRotation = head.eulerAngles,
+            neutralNeckRotation = neck.eulerAngles,
+            neutralHeadToNeckOffset = head.position - neck.position,
+            neutralHeadToNeckRotationOffset = NormalizeEulerAngles(head.eulerAngles - neck.eulerAngles)
         };
+
+        Debug.Log($"HeadTrackingModule: Captured calibration â€” " +
+                 $"Head: {snapshot.neutralHeadPosition:F3}, Neck: {snapshot.neutralNeckPosition:F3}");
+
+        return snapshot;
     }
 
-    private Transform GetHeadJoint(Transform[] joints)
+    protected override void OnCalibrationApplied()
     {
-        string headName = manager?.Config?.headJointName ?? "Head";
-        Transform head = manager?.GetJointByName(headName);
-
-        if (DebugMode)
-        {
-            if (head == null)
-                Debug.LogWarning($"HeadTrackingModule: Could not find head joint '{headName}'");
-            else
-                Debug.Log($"HeadTrackingModule: Found head joint '{headName}' at position {head.position}");
-        }
-
-        return head;
-    }
-
-    private Transform GetNeckJoint(Transform[] joints)
-    {
-        string neckName = manager?.Config?.neckJointName ?? "Neck";
-        Transform neck = manager?.GetJointByName(neckName);
-
-        if (DebugMode)
-        {
-            if (neck == null)
-                Debug.LogWarning($"HeadTrackingModule: Could not find neck joint '{neckName}'");
-            else
-                Debug.Log($"HeadTrackingModule: Found neck joint '{neckName}' at position {neck.position}");
-        }
-
-        return neck;
+        isHeadUp = false;
+        isHeadDown = false;
+        isHeadLeft = false;
+        isHeadRight = false;
     }
 
     #endregion
-    #region Update Functions
 
-    public override void UpdateTracking(ref CapturyInputState state, Transform[] joints)
+    #region Update
+
+    public override void UpdateTracking(ref CapturyInputState state)
     {
-        if (!IsEnabled || !IsCalibrated)
+        if (!IsEnabled || !IsCalibrated) return;
+
+        var cfg = HeadConfig;
+        Transform head = GetJoint(cfg.headJointName);
+        Transform neck = GetJoint(cfg.neckJointName);
+
+        if (head == null || neck == null)
         {
             if (DebugMode && Time.frameCount % 300 == 0)
-            {
-                if (!IsEnabled) Debug.Log("HeadTrackingModule: Module disabled");
-                if (!IsCalibrated) Debug.Log("HeadTrackingModule: Module not calibrated");
-            }
+                Debug.Log("HeadTrackingModule: Missing tracked joints");
             return;
         }
 
-        if (trackedHead == null || trackedNeck == null)
-        {
-            if (DebugMode && Time.frameCount % 300 == 0)
-                Debug.Log($"HeadTrackingModule: Missing tracked joints - Head: {trackedHead != null}, Neck: {trackedNeck != null}");
-            return;
-        }
+        var cal = HeadCalibration;
 
-        Vector3 currentHeadPosition = trackedHead.position;
-        Vector3 currentNeckPosition = trackedNeck.position;
-        Vector3 currentHeadRotation = trackedHead.eulerAngles;
-        Vector3 currentNeckRotation = trackedNeck.eulerAngles;
+        // position: head-to-neck offset vs neutral
+        Vector3 currentHeadToNeckOffset = head.position - neck.position;
+        Vector3 relativePositionMovement = currentHeadToNeckOffset - cal.neutralHeadToNeckOffset;
 
-        // calculate current head-to-neck offset
-        Vector3 currentHeadToNeckOffset = currentHeadPosition - currentNeckPosition;
-        Vector3 relativePositionMovement = currentHeadToNeckOffset - neutralHeadToNeckOffset;
+        // rotation: head-to-neck rotation offset vs neutral
+        Vector3 currentHeadToNeckRotationOffset = NormalizeEulerAngles(head.eulerAngles - neck.eulerAngles);
+        Vector3 relativeRotationMovement = NormalizeEulerAngles(currentHeadToNeckRotationOffset - cal.neutralHeadToNeckRotationOffset);
 
-        // calculate current head-to-neck rotation offset
-        Vector3 currentHeadToNeckRotationOffset = NormalizeEulerAngles(currentHeadRotation - currentNeckRotation);
-        Vector3 relativeRotationMovement = NormalizeEulerAngles(currentHeadToNeckRotationOffset - neutralHeadToNeckRotationOffset);
-
-        // update head position
         if (IsHeadPositionTracked)
-            UpdateHeadPosition(ref state, relativePositionMovement);
+            UpdateHeadPosition(ref state, head, relativePositionMovement);
 
-        // update head rotation
         if (IsHeadRotationTracked)
             UpdateHeadRotation(ref state, relativeRotationMovement);
 
-        // update directional detection based on relative rotation
         if (IsDirectionDetectionEnabled)
             UpdateHeadDirection(ref state, relativeRotationMovement);
     }
 
-    private void UpdateHeadPosition(ref CapturyInputState state, Vector3 relativeMovement)
+    private void UpdateHeadPosition(ref CapturyInputState state, Transform head, Vector3 relativeMovement)
     {
         if (UseRelativeHeadPosition)
-        {
             state.headPosition = relativeMovement * Sensitivity;
-        }
         else
-        {
-            state.headPosition = trackedHead.position * Sensitivity;
-        }
+            state.headPosition = head.position * Sensitivity;
     }
 
     private void UpdateHeadRotation(ref CapturyInputState state, Vector3 relativeRotation)
     {
-        // rotation relative to neck
         state.headRotation = relativeRotation * Sensitivity;
     }
 
     private void UpdateHeadDirection(ref CapturyInputState state, Vector3 relativeRotation)
     {
-        // Roll (Z rotation) - negative is looking up, positive is looking down
         float pitchAngle = relativeRotation.z;
-
-        // Yaw (Y rotation) - negative is looking left, positive is looking right
         float yawAngle = relativeRotation.y;
 
-        // HEAD UP detection (negative)
+        // HEAD UP (negative pitch)
         bool headUpNow = pitchAngle < -HeadUpThreshold;
         if (headUpNow != isHeadUp)
         {
             isHeadUp = headUpNow;
-            if (DebugMode)
-                Debug.Log($"HeadTrackingModule: HEAD {(isHeadUp ? "UP" : "NEUTRAL (vertical)")} - Pitch: {pitchAngle:F1}°");
+            if (DebugMode) Debug.Log($"HeadTrackingModule: HEAD {(isHeadUp ? "UP" : "NEUTRAL (vertical)")} â€” Pitch: {pitchAngle:F1}Â°");
         }
         state.headUp = isHeadUp ? 1.0f : 0.0f;
 
-        // HEAD DOWN detection (positive)
+        // HEAD DOWN (positive pitch)
         bool headDownNow = pitchAngle > HeadDownThreshold;
         if (headDownNow != isHeadDown)
         {
             isHeadDown = headDownNow;
-            if (DebugMode)
-                Debug.Log($"HeadTrackingModule: HEAD {(isHeadDown ? "DOWN" : "NEUTRAL (vertical)")} - Pitch: {pitchAngle:F1}°");
+            if (DebugMode) Debug.Log($"HeadTrackingModule: HEAD {(isHeadDown ? "DOWN" : "NEUTRAL (vertical)")} â€” Pitch: {pitchAngle:F1}Â°");
         }
         state.headDown = isHeadDown ? 1.0f : 0.0f;
 
-        // HEAD LEFT detection (negative)
+        // HEAD LEFT (negative yaw)
         bool headLeftNow = yawAngle < -HeadLeftThreshold;
         if (headLeftNow != isHeadLeft)
         {
             isHeadLeft = headLeftNow;
-            if (DebugMode)
-                Debug.Log($"HeadTrackingModule: HEAD {(isHeadLeft ? "LEFT" : "NEUTRAL (horizontal)")} - Yaw: {yawAngle:F1}°");
+            if (DebugMode) Debug.Log($"HeadTrackingModule: HEAD {(isHeadLeft ? "LEFT" : "NEUTRAL (horizontal)")} â€” Yaw: {yawAngle:F1}Â°");
         }
         state.headLeft = isHeadLeft ? 1.0f : 0.0f;
 
-        // HEAD RIGHT detection (positive)
+        // HEAD RIGHT (positive yaw)
         bool headRightNow = yawAngle > HeadRightThreshold;
         if (headRightNow != isHeadRight)
         {
             isHeadRight = headRightNow;
-            if (DebugMode)
-                Debug.Log($"HeadTrackingModule: HEAD {(isHeadRight ? "RIGHT" : "NEUTRAL (horizontal)")} - Yaw: {yawAngle:F1}°");
+            if (DebugMode) Debug.Log($"HeadTrackingModule: HEAD {(isHeadRight ? "RIGHT" : "NEUTRAL (horizontal)")} â€” Yaw: {yawAngle:F1}Â°");
         }
         state.headRight = isHeadRight ? 1.0f : 0.0f;
 
-        // log all values periodically for debugging
         if (DebugMode && Time.frameCount % 120 == 0)
         {
-            Debug.Log($"HeadTrackingModule: Pitch={pitchAngle:F1}°, Yaw={yawAngle:F1}° | " +
+            Debug.Log($"HeadTrackingModule: Pitch={pitchAngle:F1}Â°, Yaw={yawAngle:F1}Â° | " +
                      $"Up={isHeadUp}, Down={isHeadDown}, Left={isHeadLeft}, Right={isHeadRight}");
         }
     }
 
     #endregion
-    #region Helper Functions
 
-    private Vector3 NormalizeEulerAngles(Vector3 angles)
-    {
-        angles.x = NormalizeAngle(angles.x);
-        angles.y = NormalizeAngle(angles.y);
-        angles.z = NormalizeAngle(angles.z);
-        return angles;
-    }
-
-    private float NormalizeAngle(float angle)
-    {
-        while (angle > 180f) angle -= 360f;
-        while (angle < -180f) angle += 360f;
-        return angle;
-    }
-
-    #endregion
     #region Utility Methods
-
-    public void RecalibrateHeadModule()
-    {
-        if (trackedHead != null && trackedNeck != null)
-        {
-            Transform[] joints = { trackedHead, trackedNeck };
-            Calibrate(joints);
-        }
-    }
 
     public bool GetIsHeadUp() => isHeadUp;
     public bool GetIsHeadDown() => isHeadDown;
     public bool GetIsHeadLeft() => isHeadLeft;
     public bool GetIsHeadRight() => isHeadRight;
 
-    public Vector3 GetCurrentHeadPosition() => trackedHead?.position ?? Vector3.zero;
-    public Vector3 GetCurrentHeadRotation() => trackedHead?.eulerAngles ?? Vector3.zero;
+    public Vector3 GetCurrentHeadPosition()
+    {
+        Transform head = GetJoint(HeadConfig?.headJointName ?? "Head");
+        return head?.position ?? Vector3.zero;
+    }
+
+    public Vector3 GetCurrentHeadRotation()
+    {
+        Transform head = GetJoint(HeadConfig?.headJointName ?? "Head");
+        return head?.eulerAngles ?? Vector3.zero;
+    }
+
     public Vector3 GetRelativeHeadRotation()
     {
-        if (trackedHead == null || trackedNeck == null) return Vector3.zero;
-        Vector3 currentHeadToNeckRotationOffset = NormalizeEulerAngles(trackedHead.eulerAngles - trackedNeck.eulerAngles);
-        return NormalizeEulerAngles(currentHeadToNeckRotationOffset - neutralHeadToNeckRotationOffset);
+        var cfg = HeadConfig;
+        var cal = HeadCalibration;
+        if (cfg == null || cal == null) return Vector3.zero;
+
+        Transform head = GetJoint(cfg.headJointName);
+        Transform neck = GetJoint(cfg.neckJointName);
+        if (head == null || neck == null) return Vector3.zero;
+
+        Vector3 currentOffset = NormalizeEulerAngles(head.eulerAngles - neck.eulerAngles);
+        return NormalizeEulerAngles(currentOffset - cal.neutralHeadToNeckRotationOffset);
     }
 
     public Vector3 GetHeadRelativeToNeck()
     {
-        if (trackedHead == null || trackedNeck == null) return Vector3.zero;
-        Vector3 currentOffset = trackedHead.position - trackedNeck.position;
-        return currentOffset - neutralHeadToNeckOffset;
+        var cfg = HeadConfig;
+        var cal = HeadCalibration;
+        if (cfg == null || cal == null) return Vector3.zero;
+
+        Transform head = GetJoint(cfg.headJointName);
+        Transform neck = GetJoint(cfg.neckJointName);
+        if (head == null || neck == null) return Vector3.zero;
+
+        return (head.position - neck.position) - cal.neutralHeadToNeckOffset;
     }
 
     #endregion

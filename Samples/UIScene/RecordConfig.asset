@@ -10,22 +10,22 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3c0ac5af9e504174082cd7401bffa208, type: 3}
-  m_Name: TestConfig
+  m_Name: RecordConfig
   m_EditorClassIdentifier: 
-  configurationName: Default
-  description: Default motion tracking setup
-  calibrationDelay: 1
+  configurationName: UIConfig
+  description: Configuration for the UI Example Scene
+  calibrationDelay: 2
   calibrationFrames: 30
   modules:
-  - rid: 5667218726784335939
-  - rid: 5667218726784335940
-  - rid: 5667218726784335941
-  - rid: 5667218726784335942
-  - rid: 5667218726784335943
+  - rid: 5667218725816500292
+  - rid: 5667218725816500293
+  - rid: 5667218725816500295
+  - rid: 5667218725816500296
+  - rid: 5667218725816500297
   references:
     version: 2
     RefIds:
-    - rid: 5667218726784335939
+    - rid: 5667218725816500292
       type: {class: ArmModuleConfiguration, ns: , asm: CapturyToolkit.Runtime}
       data:
         enabled: 1
@@ -40,7 +40,7 @@ MonoBehaviour:
         rightHandJointName: RightHand
         leftShoulderJointName: LeftShoulder
         rightShoulderJointName: RightShoulder
-    - rid: 5667218726784335940
+    - rid: 5667218725816500293
       type: {class: BalanceModuleConfiguration, ns: , asm: CapturyToolkit.Runtime}
       data:
         enabled: 1
@@ -60,7 +60,7 @@ MonoBehaviour:
         rightLegJointName: RightLeg
         leftToeBaseJointName: LeftToeBase
         rightToeBaseJointName: RightToeBase
-    - rid: 5667218726784335941
+    - rid: 5667218725816500295
       type: {class: FootModuleConfiguration, ns: , asm: CapturyToolkit.Runtime}
       data:
         enabled: 1
@@ -86,7 +86,7 @@ MonoBehaviour:
         leftFootJointName: LeftFoot
         rightFootJointName: RightFoot
         walkTrackingSpineJointName: Spine
-    - rid: 5667218726784335942
+    - rid: 5667218725816500296
       type: {class: HeadModuleConfiguration, ns: , asm: CapturyToolkit.Runtime}
       data:
         enabled: 1
@@ -102,7 +102,7 @@ MonoBehaviour:
         headRightThreshold: 20
         headJointName: Head
         neckJointName: Neck
-    - rid: 5667218726784335943
+    - rid: 5667218725816500297
       type: {class: TorsoModuleConfiguration, ns: , asm: CapturyToolkit.Runtime}
       data:
         enabled: 1

@@ -8,6 +8,27 @@ public class FootTrackingModule : MotionTrackingModule
     #region Data Structures
 
     [System.Serializable]
+    public class FootCalibrationSnapshot : CalibrationSnapshot
+    {
+        public Vector3 neutralLeftFootPosition;
+        public Vector3 neutralRightFootPosition;
+        public float defaultFootDistance;
+        public float groundHeight;
+
+        public override CalibrationSnapshot Clone()
+        {
+            return new FootCalibrationSnapshot
+            {
+                timestamp = timestamp,
+                neutralLeftFootPosition = neutralLeftFootPosition,
+                neutralRightFootPosition = neutralRightFootPosition,
+                defaultFootDistance = defaultFootDistance,
+                groundHeight = groundHeight
+            };
+        }
+    }
+
+    [System.Serializable]
     public struct FootEvent
     {
         public float timestamp;
@@ -33,21 +54,13 @@ public class FootTrackingModule : MotionTrackingModule
     }
 
     #endregion
+
     #region Variables
 
-    // foot tracking
+    // internal states
     private bool isFootRaised = false;
     private bool isLeftHipAbducted = false;
     private bool isRightHipAbducted = false;
-    private float defaultFootDistance = 0.0f;
-    private float groundHeight = 0.0f;
-    private Vector3 neutralLeftFootPosition = Vector3.zero;
-    private Vector3 neutralRightFootPosition = Vector3.zero;
-    private Transform trackedLeftFoot = null;
-    private Transform trackedRightFoot = null;
-
-    // walk tracking - using spine instead of pelvis to avoid conflict with TorsoModule
-    private Transform trackedSpineForWalk = null;
 
     // walk tracking
     private WalkState currentWalkState = WalkState.Idle;
@@ -70,45 +83,46 @@ public class FootTrackingModule : MotionTrackingModule
     private float lastLeftContactTime = 0f;
     private float lastRightContactTime = 0f;
     private float currentCadence = 0f;
-    private List<float> recentStepTimes; // for consistency calculation
+    private List<float> recentStepTimes;
 
-    public override bool IsEnabled => manager?.Config?.enableFootModule ?? false;
-    public override float Sensitivity => manager?.Config?.footSensitivity ?? 1.0f;
-    public override bool DebugMode => manager?.Config?.footDebugMode ?? false;
+    // calibration access
+    private FootModuleConfiguration FootConfig => GetModuleConfig() as FootModuleConfiguration;
+    private FootCalibrationSnapshot FootCalibration => CurrentCalibration as FootCalibrationSnapshot;
 
-    // basic foot tracking
-    public bool IsFootRaiseTracked => manager?.Config?.isFootRaiseTracked ?? true;
-    public bool IsHipAbductionTracked => manager?.Config?.isHipAbductionTracked ?? true;
-    public bool IsFootPositionTracked => manager?.Config?.isFootPositionTracked ?? true;
-    public bool UseRelativeFootPosition => manager?.Config?.useRelativeFootPosition ?? true;
-    public float FootRaiseThreshold => manager?.Config?.footRaiseThreshold ?? 0.1f;
-    public float MinAbductionDistance => manager?.Config?.minAbductionDistance ?? 0.2f;
-    public float MinLiftHeight => manager?.Config?.minLiftHeight ?? 0.05f;
+    // config values with fallbacks
+    public bool IsFootRaiseTracked => FootConfig?.isFootRaiseTracked ?? true;
+    public bool IsHipAbductionTracked => FootConfig?.isHipAbductionTracked ?? true;
+    public bool IsFootPositionTracked => FootConfig?.isFootPositionTracked ?? true;
+    public bool UseRelativeFootPosition => FootConfig?.useRelativeFootPosition ?? true;
+    public float FootRaiseThreshold => FootConfig?.footRaiseThreshold ?? 0.1f;
+    public float MinAbductionDistance => FootConfig?.minAbductionDistance ?? 0.2f;
+    public float MinLiftHeight => FootConfig?.minLiftHeight ?? 0.05f;
 
-    // walk tracking
-    public bool IsWalkTrackingEnabled => manager?.Config?.enableWalkTracking ?? false;
-    public float WalkSpeedThreshold => manager?.Config?.walkSpeedThreshold ?? 0.3f;
-    public float MinimumWalkDuration => manager?.Config?.minimumWalkDuration ?? 2.0f;
-    public float WalkStopThreshold => manager?.Config?.walkStopThreshold ?? 0.1f;
+    public bool IsWalkTrackingEnabled => FootConfig?.enableWalkTracking ?? false;
+    public float WalkSpeedThreshold => FootConfig?.walkSpeedThreshold ?? 0.3f;
+    public float MinimumWalkDuration => FootConfig?.minimumWalkDuration ?? 2.0f;
+    public float WalkStopThreshold => FootConfig?.walkStopThreshold ?? 0.1f;
 
-    // gait analysis
-    public bool IsGaitAnalysisEnabled => manager?.Config?.enableGaitAnalysis ?? false;
-    public int MinimumCyclesForAnalysis => manager?.Config?.minimumCyclesForAnalysis ?? 3;
-    public float MaxReasonableStepTime => manager?.Config?.maxReasonableStepTime ?? 2.0f;
-    public float MinReasonableStepTime => manager?.Config?.minReasonableStepTime ?? 0.3f;
-    
-    // data buffering
-    public int PositionHistoryFrames => manager?.Config?.positionHistoryFrames ?? 300;
-    public int EventHistoryCount => manager?.Config?.eventHistoryCount ?? 20;
+    public bool IsGaitAnalysisEnabled => FootConfig?.enableGaitAnalysis ?? false;
+    public int MinimumCyclesForAnalysis => FootConfig?.minimumCyclesForAnalysis ?? 3;
+    public float MaxReasonableStepTime => FootConfig?.maxReasonableStepTime ?? 2.0f;
+    public float MinReasonableStepTime => FootConfig?.minReasonableStepTime ?? 0.3f;
+    public int PositionHistoryFrames => FootConfig?.positionHistoryFrames ?? 300;
+    public int EventHistoryCount => FootConfig?.eventHistoryCount ?? 20;
 
     #endregion
-    #region Initialize, Calibrate, Joints
+
+    #region Base Class Implementation
+
+    public override ModuleConfiguration GetModuleConfig()
+    {
+        return manager?.Config?.GetModuleConfig<FootModuleConfiguration>();
+    }
 
     public override void Initialize(IMotionTrackingManager manager)
     {
         base.Initialize(manager);
 
-        // initialize simplified data structures
         spinePositionHistory = new Queue<Vector3>();
         timestampHistory = new Queue<float>();
         footEventHistory = new Queue<FootEvent>();
@@ -117,165 +131,104 @@ public class FootTrackingModule : MotionTrackingModule
         Debug.Log($"FootTrackingModule: Initialized with Walk: {IsWalkTrackingEnabled}, Gait: {IsGaitAnalysisEnabled}");
     }
 
-    public override void Calibrate(Transform[] joints)
+    protected override CalibrationSnapshot CaptureCalibration()
     {
-        Debug.Log("FootTrackingModule: Calibrate() called");
-        Transform leftFoot = GetLeftFootJoint(joints);
-        Transform rightFoot = GetRightFootJoint(joints);
+        string leftFootName = FootConfig?.leftFootJointName ?? "LeftFoot";
+        string rightFootName = FootConfig?.rightFootJointName ?? "RightFoot";
 
-        if (leftFoot != null && rightFoot != null)
+        Transform leftFoot = GetJoint(leftFootName);
+        Transform rightFoot = GetJoint(rightFootName);
+
+        if (leftFoot == null || rightFoot == null)
         {
-            trackedLeftFoot = leftFoot;
-            trackedRightFoot = rightFoot;
-
-            Vector3 leftPos = leftFoot.position;
-            Vector3 rightPos = rightFoot.position;
-
-            neutralLeftFootPosition = leftPos;
-            neutralRightFootPosition = rightPos;
-
-            Vector2 leftPos2D = new Vector2(leftPos.x, leftPos.z);
-            Vector2 rightPos2D = new Vector2(rightPos.x, rightPos.z);
-            defaultFootDistance = Vector2.Distance(leftPos2D, rightPos2D);
-            groundHeight = (leftPos.y + rightPos.y) / 2.0f;
-
-            // get spine for walk tracking if enabled
-            if (IsWalkTrackingEnabled || IsGaitAnalysisEnabled)
-            {
-                trackedSpineForWalk = GetSpineForWalkJoint(joints);
-                if (trackedSpineForWalk == null)
-                {
-                    Debug.LogWarning("FootTrackingModule: Could not find Spine joint for walk tracking! Walk detection may not work correctly.");
-                }
-            }
-
-            ClearHistoryBuffers();
-
-            isCalibrated = true;
-            Debug.Log("FootTrackingModule: Successfully calibrated with simplified walk/gait support!");
+            Debug.LogError("FootTrackingModule: Missing foot joints during calibration capture");
+            return null;
         }
-        else
+
+        Vector3 leftPos = leftFoot.position;
+        Vector3 rightPos = rightFoot.position;
+
+        Vector2 leftPos2D = new Vector2(leftPos.x, leftPos.z);
+        Vector2 rightPos2D = new Vector2(rightPos.x, rightPos.z);
+
+        var snapshot = new FootCalibrationSnapshot
         {
-            Debug.LogError($"FootTrackingModule: Failed to calibrate - missing joints!");
-            isCalibrated = false;
-        }
-    }
-
-    public override bool HasRequiredJoints(Transform[] joints)
-    {
-        bool hasFeet = GetLeftFootJoint(joints) != null && GetRightFootJoint(joints) != null;
-        
-        // if walk tracking is enabled, also need spine
-        if (IsWalkTrackingEnabled || IsGaitAnalysisEnabled)
-        {
-            bool hasSpine = GetSpineForWalkJoint(joints) != null;
-            return hasFeet && hasSpine;
-        }
-        
-        return hasFeet;
-    }
-
-    public override string[] GetRequiredJointNames()
-    {
-        if (IsWalkTrackingEnabled || IsGaitAnalysisEnabled)
-        {
-            return new string[] {
-                manager?.Config?.leftFootJointName ?? "LeftFoot",
-                manager?.Config?.rightFootJointName ?? "RightFoot",
-                manager?.Config?.walkTrackingSpineJointName ?? "Spine"
-            };
-        }
-        
-        return new string[] {
-            manager?.Config?.leftFootJointName ?? "LeftFoot",
-            manager?.Config?.rightFootJointName ?? "RightFoot"
+            neutralLeftFootPosition = leftPos,
+            neutralRightFootPosition = rightPos,
+            defaultFootDistance = Vector2.Distance(leftPos2D, rightPos2D),
+            groundHeight = (leftPos.y + rightPos.y) / 2.0f
         };
+
+        ClearHistoryBuffers();
+
+        Debug.Log($"FootTrackingModule: Captured calibration — Ground: {snapshot.groundHeight:F3}, FootDist: {snapshot.defaultFootDistance:F3}");
+        return snapshot;
     }
 
-    private Transform GetLeftFootJoint(Transform[] joints)
+    protected override void OnCalibrationApplied()
     {
-        string leftFootName = manager?.Config?.leftFootJointName ?? "LeftFoot";
-        return manager?.GetJointByName(leftFootName);
-    }
-
-    private Transform GetRightFootJoint(Transform[] joints)
-    {
-        string rightFootName = manager?.Config?.rightFootJointName ?? "RightFoot";
-        return manager?.GetJointByName(rightFootName);
-    }
-
-    private Transform GetSpineForWalkJoint(Transform[] joints)
-    {
-        string spineName = manager?.Config?.walkTrackingSpineJointName ?? "Spine";
-        Transform spine = manager?.GetJointByName(spineName);
-        
-        if (DebugMode)
-        {
-            if (spine == null)
-                Debug.LogWarning($"FootTrackingModule: Could not find spine joint '{spineName}' for walk tracking");
-            else
-                Debug.Log($"FootTrackingModule: Found spine joint '{spineName}' for walk tracking at {spine.position}");
-        }
-        
-        return spine;
+        isFootRaised = false;
+        isLeftHipAbducted = false;
+        isRightHipAbducted = false;
+        ClearHistoryBuffers();
     }
 
     #endregion
+
     #region Main Update Loop
 
-    public override void UpdateTracking(ref CapturyInputState state, Transform[] joints)
+    public override void UpdateTracking(ref CapturyInputState state)
     {
-        if (!IsEnabled || !IsCalibrated || trackedLeftFoot == null || trackedRightFoot == null)
+        if (!IsEnabled || !IsCalibrated) return;
+
+        string leftFootName = FootConfig.leftFootJointName;
+        string rightFootName = FootConfig.rightFootJointName;
+        Transform leftFoot = GetJoint(leftFootName);
+        Transform rightFoot = GetJoint(rightFootName);
+
+        if (leftFoot == null || rightFoot == null)
         {
             if (DebugMode && Time.frameCount % 300 == 0)
-                Debug.Log("FootTrackingModule: Not updating - disabled or not calibrated");
+                Debug.Log("FootTrackingModule: Missing tracked foot joints");
             return;
         }
 
-        Vector3 leftPos = trackedLeftFoot.position;
-        Vector3 rightPos = trackedRightFoot.position;
-        float leftHeight = leftPos.y - groundHeight;
-        float rightHeight = rightPos.y - groundHeight;
+        var cal = FootCalibration;
+        Vector3 leftPos = leftFoot.position;
+        Vector3 rightPos = rightFoot.position;
+        float leftHeight = leftPos.y - cal.groundHeight;
+        float rightHeight = rightPos.y - cal.groundHeight;
 
         // update data buffers
         if (IsWalkTrackingEnabled || IsGaitAnalysisEnabled)
-        {
             UpdateDataBuffers();
-        }
 
-        // layer 1: foot tracking (always runs)
+        // layer 1: basic foot tracking
         UpdateBasicFootTracking(ref state, leftPos, rightPos, leftHeight, rightHeight);
 
-        // layer 2: walk detection (if enabled)
+        // layer 2: walk detection
         if (IsWalkTrackingEnabled)
-        {
             UpdateWalkDetection(ref state);
-        }
 
-        // layer 3: gait analysis (if enabled)
+        // layer 3: gait analysis
         if (IsGaitAnalysisEnabled)
-        {
             UpdateGaitAnalysis(ref state, leftHeight, rightHeight);
-        }
 
-        // update walk state in output
+        // update walk state output
         if (IsWalkTrackingEnabled)
-        {
             UpdateWalkState(ref state);
-        }
     }
 
     #endregion
+
     #region Layer 1: Basic Foot Tracking
 
     private void UpdateBasicFootTracking(ref CapturyInputState state, Vector3 leftPos, Vector3 rightPos, float leftHeight, float rightHeight)
     {
         if (IsFootRaiseTracked)
             UpdateFootRaise(ref state, leftHeight, rightHeight);
-
         if (IsHipAbductionTracked)
             UpdateHipAbduction(ref state, leftPos, rightPos, leftHeight, rightHeight);
-
         if (IsFootPositionTracked)
             UpdateFootPositions(ref state, leftPos, rightPos);
     }
@@ -283,7 +236,6 @@ public class FootTrackingModule : MotionTrackingModule
     private void UpdateFootRaise(ref CapturyInputState state, float leftHeight, float rightHeight)
     {
         float footHeightDifference = Mathf.Abs(leftHeight - rightHeight);
-
         bool footRaisedNow = footHeightDifference > FootRaiseThreshold;
 
         if (footRaisedNow && !isFootRaised)
@@ -291,18 +243,14 @@ public class FootTrackingModule : MotionTrackingModule
             isFootRaised = true;
             state.footRaised = 1.0f;
             state.footLowered = 0.0f;
-
-            if (DebugMode)
-                Debug.Log($"FootTrackingModule: FOOT RAISED!");
+            if (DebugMode) Debug.Log("FootTrackingModule: FOOT RAISED!");
         }
         else if (!footRaisedNow && isFootRaised)
         {
             isFootRaised = false;
             state.footRaised = 0.0f;
             state.footLowered = 1.0f;
-
-            if (DebugMode)
-                Debug.Log($"FootTrackingModule: FOOT LOWERED!");
+            if (DebugMode) Debug.Log("FootTrackingModule: FOOT LOWERED!");
         }
         else
         {
@@ -313,10 +261,11 @@ public class FootTrackingModule : MotionTrackingModule
 
     private void UpdateHipAbduction(ref CapturyInputState state, Vector3 leftPos, Vector3 rightPos, float leftHeight, float rightHeight)
     {
+        var cal = FootCalibration;
         Vector2 leftPos2D = new Vector2(leftPos.x, leftPos.z);
         Vector2 rightPos2D = new Vector2(rightPos.x, rightPos.z);
         float currentDistance = Vector2.Distance(leftPos2D, rightPos2D);
-        float abductionDistance = currentDistance - defaultFootDistance;
+        float abductionDistance = currentDistance - cal.defaultFootDistance;
 
         bool leftLiftedEnough = leftHeight > MinLiftHeight;
         bool rightLiftedEnough = rightHeight > MinLiftHeight;
@@ -342,10 +291,11 @@ public class FootTrackingModule : MotionTrackingModule
 
     private void UpdateFootPositions(ref CapturyInputState state, Vector3 leftPos, Vector3 rightPos)
     {
+        var cal = FootCalibration;
         if (UseRelativeFootPosition)
         {
-            state.leftFootPosition = (leftPos - neutralLeftFootPosition) * Sensitivity;
-            state.rightFootPosition = (rightPos - neutralRightFootPosition) * Sensitivity;
+            state.leftFootPosition = (leftPos - cal.neutralLeftFootPosition) * Sensitivity;
+            state.rightFootPosition = (rightPos - cal.neutralRightFootPosition) * Sensitivity;
         }
         else
         {
@@ -355,21 +305,18 @@ public class FootTrackingModule : MotionTrackingModule
     }
 
     #endregion
+
     #region Layer 2: Walk Detection
 
     private void UpdateDataBuffers()
     {
-        float currentTime = Time.time;
-        timestampHistory.Enqueue(currentTime);
+        timestampHistory.Enqueue(Time.time);
 
-        // get spine for walk speed calculation
-        // NOTE: now using Spine instead of Pelvis to avoid conflict with TorsoModule
-        if (trackedSpineForWalk != null)
-        {
-            spinePositionHistory.Enqueue(trackedSpineForWalk.position);
-        }
+        string spineName = FootConfig?.walkTrackingSpineJointName ?? "Spine";
+        Transform spine = GetJoint(spineName);
+        if (spine != null)
+            spinePositionHistory.Enqueue(spine.position);
 
-        // maintain buffer size
         while (spinePositionHistory.Count > PositionHistoryFrames)
         {
             spinePositionHistory.Dequeue();
@@ -380,7 +327,6 @@ public class FootTrackingModule : MotionTrackingModule
     private void UpdateWalkDetection(ref CapturyInputState state)
     {
         float currentSpeed = CalculateCurrentSpeed();
-
         previousWalkState = currentWalkState;
 
         switch (currentWalkState)
@@ -442,18 +388,22 @@ public class FootTrackingModule : MotionTrackingModule
 
         Vector3 movement = recentPositions[recentPositions.Length - 1] - recentPositions[0];
         float timeSpan = 0.5f; // 30 frames at 60fps
-
         return movement.magnitude / timeSpan;
     }
 
     #endregion
+
     #region Layer 3: Gait Analysis
 
     private void UpdateGaitAnalysis(ref CapturyInputState state, float leftHeight, float rightHeight)
     {
         float currentTime = Time.time;
 
-        // foot contact detection
+        string leftFootName = FootConfig.leftFootJointName;
+        string rightFootName = FootConfig.rightFootJointName;
+        Transform leftFoot = GetJoint(leftFootName);
+        Transform rightFoot = GetJoint(rightFootName);
+
         bool leftContactNow = leftHeight < (MinLiftHeight * 0.5f);
         bool rightContactNow = rightHeight < (MinLiftHeight * 0.5f);
 
@@ -461,7 +411,7 @@ public class FootTrackingModule : MotionTrackingModule
         if (leftContactNow && !leftFootInContact)
         {
             leftFootInContact = true;
-            RecordFootEvent(currentTime, true, true, trackedLeftFoot.position);
+            if (leftFoot != null) RecordFootEvent(currentTime, true, true, leftFoot.position);
 
             if (lastLeftContactTime > 0)
             {
@@ -472,7 +422,6 @@ public class FootTrackingModule : MotionTrackingModule
                     state.leftStep = 1.0f;
                     state.leftStepTime = stepTime;
                     recentStepTimes.Add(stepTime);
-
                     if (DebugMode) Debug.Log($"LEFT STEP: {stepTime:F3}s");
                 }
             }
@@ -481,7 +430,7 @@ public class FootTrackingModule : MotionTrackingModule
         else if (!leftContactNow && leftFootInContact)
         {
             leftFootInContact = false;
-            RecordFootEvent(currentTime, true, false, trackedLeftFoot.position);
+            if (leftFoot != null) RecordFootEvent(currentTime, true, false, leftFoot.position);
         }
         else
         {
@@ -492,7 +441,7 @@ public class FootTrackingModule : MotionTrackingModule
         if (rightContactNow && !rightFootInContact)
         {
             rightFootInContact = true;
-            RecordFootEvent(currentTime, false, true, trackedRightFoot.position);
+            if (rightFoot != null) RecordFootEvent(currentTime, false, true, rightFoot.position);
 
             if (lastRightContactTime > 0)
             {
@@ -503,7 +452,6 @@ public class FootTrackingModule : MotionTrackingModule
                     state.rightStep = 1.0f;
                     state.rightStepTime = stepTime;
                     recentStepTimes.Add(stepTime);
-
                     if (DebugMode) Debug.Log($"RIGHT STEP: {stepTime:F3}s");
                 }
             }
@@ -512,51 +460,39 @@ public class FootTrackingModule : MotionTrackingModule
         else if (!rightContactNow && rightFootInContact)
         {
             rightFootInContact = false;
-            RecordFootEvent(currentTime, false, false, trackedRightFoot.position);
+            if (rightFoot != null) RecordFootEvent(currentTime, false, false, rightFoot.position);
         }
         else
         {
             state.rightStep = 0.0f;
         }
 
-        // analyze gait metrics
         AnalyzeGaitMetrics(ref state);
     }
 
     private void RecordFootEvent(float time, bool isLeftFoot, bool isFootDown, Vector3 position)
     {
-        FootEvent evt = new FootEvent(time, isLeftFoot, isFootDown, position);
-        footEventHistory.Enqueue(evt);
-
+        footEventHistory.Enqueue(new FootEvent(time, isLeftFoot, isFootDown, position));
         while (footEventHistory.Count > EventHistoryCount)
-        {
             footEventHistory.Dequeue();
-        }
     }
 
     private void AnalyzeGaitMetrics(ref CapturyInputState state)
     {
         if (lastLeftStepTime > 0 && lastRightStepTime > 0)
         {
-            // calculate asymmetry
             float stepTimeAsymmetry = Mathf.Abs(lastLeftStepTime - lastRightStepTime) /
                                     ((lastLeftStepTime + lastRightStepTime) / 2f);
-
             state.stepTimeAsymmetry = stepTimeAsymmetry;
 
-            // calculate cadence
             float averageStepTime = (lastLeftStepTime + lastRightStepTime) / 2f;
             currentCadence = 60f / averageStepTime;
             state.cadence = currentCadence;
 
-            // gait consistency
-            if (recentStepTimes.Count >= MinimumCyclesForAnalysis * 2) // need multiple steps
+            if (recentStepTimes.Count >= MinimumCyclesForAnalysis * 2)
             {
-                // keep only recent step times
                 while (recentStepTimes.Count > 20)
-                {
                     recentStepTimes.RemoveAt(0);
-                }
 
                 float mean = recentStepTimes.Average();
                 float variance = recentStepTimes.Select(t => (t - mean) * (t - mean)).Average();
@@ -568,6 +504,7 @@ public class FootTrackingModule : MotionTrackingModule
     }
 
     #endregion
+
     #region Layer 4: State Output
 
     private void UpdateWalkState(ref CapturyInputState state)
@@ -579,6 +516,7 @@ public class FootTrackingModule : MotionTrackingModule
     }
 
     #endregion
+
     #region Utility Methods
 
     private void ClearHistoryBuffers()
@@ -593,24 +531,17 @@ public class FootTrackingModule : MotionTrackingModule
         rightFootInContact = false;
     }
 
-    public void RecalibrateFootModule()
-    {
-        if (trackedLeftFoot != null && trackedRightFoot != null)
-        {
-            Transform[] joints = { trackedLeftFoot, trackedRightFoot };
-            Calibrate(joints);
-        }
-    }
-
     public float GetCurrentFootDistance()
     {
-        if (trackedLeftFoot == null || trackedRightFoot == null) return 0f;
+        string leftFootName = FootConfig?.leftFootJointName ?? "LeftFoot";
+        string rightFootName = FootConfig?.rightFootJointName ?? "RightFoot";
+        Transform leftFoot = GetJoint(leftFootName);
+        Transform rightFoot = GetJoint(rightFootName);
 
-        Vector3 leftPos = trackedLeftFoot.position;
-        Vector3 rightPos = trackedRightFoot.position;
-        Vector2 leftPos2D = new Vector2(leftPos.x, leftPos.z);
-        Vector2 rightPos2D = new Vector2(rightPos.x, rightPos.z);
+        if (leftFoot == null || rightFoot == null) return 0f;
 
+        Vector2 leftPos2D = new Vector2(leftFoot.position.x, leftFoot.position.z);
+        Vector2 rightPos2D = new Vector2(rightFoot.position.x, rightFoot.position.z);
         return Vector2.Distance(leftPos2D, rightPos2D);
     }
 

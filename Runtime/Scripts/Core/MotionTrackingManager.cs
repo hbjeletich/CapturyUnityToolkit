@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using Captury;
 using UnityEngine.InputSystem;
@@ -18,12 +19,7 @@ public class MotionTrackingManager : MonoBehaviour, IMotionTrackingManager
     private Dictionary<string, Transform> jointLookup = new Dictionary<string, Transform>();
 
     // modules
-    private TorsoTrackingModule torsoModule;
-    private FootTrackingModule footModule;
-    private ArmTrackingModule armsModule;
-    private HeadTrackingModule headModule;
-    private BalanceTrackingModule balanceModule;
-    private List<MotionTrackingModule> allModules;
+    private List<MotionTrackingModule> allModules = new List<MotionTrackingModule>();
 
     // state
     private bool isSystemCalibrated = false;
@@ -60,7 +56,7 @@ public class MotionTrackingManager : MonoBehaviour, IMotionTrackingManager
         {
             if (enableDebugLogging && Time.frameCount % 600 == 0)
             {
-                Debug.Log($"MotionTrackingManager: Not updating modules - Calibrated: {isSystemCalibrated}, CapturyInput present: {capturyInput != null}");
+                Debug.Log($"MotionTrackingManager: Not updating modules — Calibrated: {isSystemCalibrated}, CapturyInput present: {capturyInput != null}");
             }
         }
     }
@@ -72,6 +68,7 @@ public class MotionTrackingManager : MonoBehaviour, IMotionTrackingManager
     }
 
     #endregion
+
     #region Setup and Configuration
 
     private void SetupSingleton()
@@ -105,7 +102,6 @@ public class MotionTrackingManager : MonoBehaviour, IMotionTrackingManager
         if (enableDebugLogging)
             Debug.Log($"MotionTrackingManager: Loading configuration '{config.configurationName}'");
 
-        // initialize modules - this will create allModules if needed
         InitializeModules();
 
         if (isSystemCalibrated)
@@ -114,7 +110,7 @@ public class MotionTrackingManager : MonoBehaviour, IMotionTrackingManager
         }
 
         if (enableDebugLogging)
-            Debug.Log($"MotionTrackingManager: Loaded configuration '{config.configurationName}' with {allModules?.Count ?? 0} active modules");
+            Debug.Log($"MotionTrackingManager: Loaded configuration '{config.configurationName}' with {allModules.Count} active modules");
     }
 
     private void LoadDefaultConfiguration()
@@ -131,58 +127,29 @@ public class MotionTrackingManager : MonoBehaviour, IMotionTrackingManager
         }
     }
 
+    // iterates the config's module list and calls each config's CreateModule()
     private void InitializeModules()
     {
         if (enableDebugLogging) Debug.Log("MotionTrackingManager: Initializing modules...");
 
-        if (allModules == null)
-            allModules = new List<MotionTrackingModule>();
+        allModules.Clear();
 
-        if (config.enableTorsoModule)
-        {
-            GameObject torsoObj = new GameObject("TorsoTrackingModule");
-            torsoObj.transform.SetParent(transform);
-            torsoModule = torsoObj.AddComponent<TorsoTrackingModule>();
-            allModules.Add(torsoModule);
-        }
+        GameObject moduleParent = new GameObject("TrackingModules");
+        moduleParent.transform.SetParent(transform);
 
-        if (config.enableFootModule)
+        foreach (var moduleConfig in config.modules)
         {
-            GameObject footObj = new GameObject("FootTrackingModule");
-            footObj.transform.SetParent(transform);
-            footModule = footObj.AddComponent<FootTrackingModule>();
-            allModules.Add(footModule);
-        }
+            if (moduleConfig == null || !moduleConfig.enabled) continue;
 
-        if (config.enableArmsModule)
-        {
-            GameObject armsObj = new GameObject("ArmTrackingModule");
-            armsObj.transform.SetParent(transform);
-            armsModule = armsObj.AddComponent<ArmTrackingModule>();
-            allModules.Add(armsModule);
-        }
+            MotionTrackingModule module = moduleConfig.CreateModule(moduleParent);
+            if (module != null)
+            {
+                module.Initialize(this);
+                allModules.Add(module);
 
-        if (config.enableHeadModule)
-        {
-            GameObject headObj = new GameObject("HeadTrackingModule");
-            headObj.transform.SetParent(transform);
-            headModule = headObj.AddComponent<HeadTrackingModule>();
-            allModules.Add(headModule);
-        }
-
-        if (config.enableBalanceModule)
-        {
-            GameObject balanceObj = new GameObject("BalanceTrackingModule");
-            balanceObj.transform.SetParent(transform);
-            balanceModule = balanceObj.AddComponent<BalanceTrackingModule>();
-            allModules.Add(balanceModule);
-        }
-
-        foreach (var module in allModules)
-        {
-            module.Initialize(this);
-            if (enableDebugLogging)
-                Debug.Log($"MotionTrackingManager: Initialized {module.GetType().Name} - Enabled: {module.IsEnabled}");
+                if (enableDebugLogging)
+                    Debug.Log($"MotionTrackingManager: Initialized {module.GetType().Name} — Enabled: {module.IsEnabled}");
+            }
         }
     }
 
@@ -221,6 +188,7 @@ public class MotionTrackingManager : MonoBehaviour, IMotionTrackingManager
     }
 
     #endregion
+
     #region Skeleton and Calibration
 
     private void OnSkeletonFound(CapturySkeleton skeleton)
@@ -233,7 +201,7 @@ public class MotionTrackingManager : MonoBehaviour, IMotionTrackingManager
     {
         if (enableDebugLogging) Debug.Log("MotionTrackingManager: Skeleton setup complete, building joint lookup...");
         BuildJointLookup(skeleton);
-        StartCoroutine(CalibrateSystem());
+        activeCalibrationCoroutine = StartCoroutine(CalibrateSystem());
     }
 
     private void BuildJointLookup(CapturySkeleton skeleton)
@@ -254,17 +222,14 @@ public class MotionTrackingManager : MonoBehaviour, IMotionTrackingManager
 
         yield return new WaitForSeconds(config.calibrationDelay);
 
-        Transform[] joints = new Transform[jointLookup.Count];
-        jointLookup.Values.CopyTo(joints, 0);
-
         if (enableDebugLogging) Debug.Log($"MotionTrackingManager: Calibrating {allModules.Count} modules...");
 
         foreach (var module in allModules)
         {
-            if (module.HasRequiredJoints(joints))
+            if (module.HasRequiredJoints())
             {
                 if (enableDebugLogging) Debug.Log($"MotionTrackingManager: Calibrating {module.GetType().Name}...");
-                module.Calibrate(joints);
+                module.Calibrate();
             }
             else
             {
@@ -281,25 +246,17 @@ public class MotionTrackingManager : MonoBehaviour, IMotionTrackingManager
     {
         if (enableDebugLogging) Debug.Log("MotionTrackingManager: Cleaning up modules...");
 
-        if (allModules != null)
+        foreach (var module in allModules)
         {
-            foreach (var module in allModules)
+            if (module != null && module.gameObject != null)
             {
-                if (module != null && module.gameObject != null)
-                {
-                    if (enableDebugLogging) Debug.Log($"MotionTrackingManager: Destroying {module.GetType().Name}");
-                    DestroyImmediate(module.gameObject);
-                }
+                if (enableDebugLogging) Debug.Log($"MotionTrackingManager: Destroying {module.GetType().Name}");
+                // destroy the module parent (TrackingModules container)
+                DestroyImmediate(module.gameObject.transform.parent.gameObject);
+                break; // parent holds all modules, one destroy cleans them all
             }
-            allModules.Clear();
         }
-
-        // clear module references
-        torsoModule = null;
-        footModule = null;
-        armsModule = null;
-        headModule = null;
-        balanceModule = null;
+        allModules.Clear();
     }
 
     private void CleanupSystem()
@@ -314,24 +271,23 @@ public class MotionTrackingManager : MonoBehaviour, IMotionTrackingManager
     }
 
     #endregion
+
     #region Tracking Updates
 
     private void UpdateAllModules()
     {
         CapturyInputState state = new CapturyInputState();
 
-        Transform[] joints = new Transform[jointLookup.Count];
-        jointLookup.Values.CopyTo(joints, 0);
-
         foreach (var module in allModules)
         {
-            module.UpdateTracking(ref state, joints);
+            module.UpdateTracking(ref state);
         }
 
         InputSystem.QueueStateEvent(capturyInput, state);
     }
 
     #endregion
+
     #region Public Methods
 
     public Transform GetJointByName(string jointName)
@@ -344,18 +300,33 @@ public class MotionTrackingManager : MonoBehaviour, IMotionTrackingManager
     {
         if (enableDebugLogging) Debug.Log("MotionTrackingManager: Manual recalibration requested");
 
-        // stop any active calibration
         if (activeCalibrationCoroutine != null)
         {
             StopCoroutine(activeCalibrationCoroutine);
             activeCalibrationCoroutine = null;
         }
 
-        // mark as not calibrated
         isSystemCalibrated = false;
-
-        // start new calibration
         activeCalibrationCoroutine = StartCoroutine(CalibrateSystem());
+    }
+
+    // revert all modules to their previous calibration snapshot.
+    public bool LoadPreviousCalibration()
+    {
+        bool allRestored = true;
+        foreach (var module in allModules)
+        {
+            if (!module.LoadPreviousCalibration())
+            {
+                allRestored = false;
+                Debug.LogWarning($"MotionTrackingManager: {module.GetType().Name} had no previous calibration");
+            }
+        }
+
+        if (enableDebugLogging)
+            Debug.Log($"MotionTrackingManager: LoadPreviousCalibration — all restored: {allRestored}");
+
+        return allRestored;
     }
 
     public void SwapConfiguration(MotionTrackingConfiguration newConfig)
@@ -369,7 +340,6 @@ public class MotionTrackingManager : MonoBehaviour, IMotionTrackingManager
         if (enableDebugLogging)
             Debug.Log($"MotionTrackingManager: Swapping configuration from '{config?.configurationName ?? "none"}' to '{newConfig.configurationName}'");
 
-        // stop any active calibration
         if (activeCalibrationCoroutine != null)
         {
             StopCoroutine(activeCalibrationCoroutine);
@@ -377,21 +347,17 @@ public class MotionTrackingManager : MonoBehaviour, IMotionTrackingManager
         }
 
         bool wasCalibrated = isSystemCalibrated;
-
         isSystemCalibrated = false;
 
         CleanupModules();
 
-        // load new configuration
         config = newConfig;
 
         if (enableDebugLogging)
             Debug.Log($"MotionTrackingManager: Initializing new modules for configuration '{config.configurationName}'");
 
-        // reinitialize modules with new config
         InitializeModules();
 
-        // if we were calibrated before and have joints, recalibrate
         if (wasCalibrated && jointLookup.Count > 0)
         {
             if (enableDebugLogging)
@@ -404,27 +370,39 @@ public class MotionTrackingManager : MonoBehaviour, IMotionTrackingManager
         }
 
         if (enableDebugLogging)
-            Debug.Log($"MotionTrackingManager: Configuration swap complete - '{config.configurationName}' with {allModules?.Count ?? 0} active modules");
+            Debug.Log($"MotionTrackingManager: Configuration swap complete — '{config.configurationName}' with {allModules.Count} active modules");
     }
 
-    // public accessors for modules
-    public TorsoTrackingModule GetTorsoModule() => torsoModule;
-    public FootTrackingModule GetFootModule() => footModule;
-    public ArmTrackingModule GetArmsModule() => armsModule;
-    public HeadTrackingModule GetHeadModule() => headModule;
-    public BalanceTrackingModule GetBalanceModule() => balanceModule;
+    // generic module access — works for any module type including custom ones
+    public T GetModule<T>() where T : MotionTrackingModule
+    {
+        return allModules.OfType<T>().FirstOrDefault();
+    }
 
-    // quick access to module states
-    public bool IsTorsoModuleEnabled => config.enableTorsoModule && torsoModule?.IsCalibrated == true;
-    public bool IsFootModuleEnabled => config.enableFootModule && footModule?.IsCalibrated == true;
-    public bool IsArmsModuleEnabled => config.enableArmsModule && armsModule?.IsCalibrated == true;
-    public bool IsHeadModuleEnabled => config.enableHeadModule && headModule?.IsCalibrated == true;
-    public bool IsBalanceModuleEnabled => config.enableBalanceModule && balanceModule?.IsCalibrated == true;
+    // public getters for built-in modules
+    public TorsoTrackingModule GetTorsoModule() => GetModule<TorsoTrackingModule>();
+    public FootTrackingModule GetFootModule() => GetModule<FootTrackingModule>();
+    public ArmTrackingModule GetArmsModule() => GetModule<ArmTrackingModule>();
+    public HeadTrackingModule GetHeadModule() => GetModule<HeadTrackingModule>();
+    public BalanceTrackingModule GetBalanceModule() => GetModule<BalanceTrackingModule>();
 
-    // system state accessors
+    // module state checks — now config-driven
+    public bool IsModuleActive<T>() where T : MotionTrackingModule
+    {
+        var module = GetModule<T>();
+        return module != null && module.IsEnabled && module.IsCalibrated;
+    }
+
+    public bool IsTorsoModuleEnabled => IsModuleActive<TorsoTrackingModule>();
+    public bool IsFootModuleEnabled => IsModuleActive<FootTrackingModule>();
+    public bool IsArmsModuleEnabled => IsModuleActive<ArmTrackingModule>();
+    public bool IsHeadModuleEnabled => IsModuleActive<HeadTrackingModule>();
+    public bool IsBalanceModuleEnabled => IsModuleActive<BalanceTrackingModule>();
+
+    // system state
     public bool IsSystemCalibrated => isSystemCalibrated;
     public bool IsCalibrating => activeCalibrationCoroutine != null;
-    public int ActiveModuleCount => allModules?.Count ?? 0;
+    public int ActiveModuleCount => allModules.Count;
     public string CurrentConfigurationName => config?.configurationName ?? "None";
 
     #endregion

@@ -1,0 +1,55 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3c0ac5af9e504174082cd7401bffa208, type: 3}
+  m_Name: PongConfig
+  m_EditorClassIdentifier: 
+  configurationName: Pong
+  description: Default motion tracking setup for Pong
+  calibrationDelay: 0
+  calibrationFrames: 30
+  modules:
+  - rid: 5667218725816500298
+  - rid: 5667218726784335947
+  references:
+    version: 2
+    RefIds:
+    - rid: 5667218725816500298
+      type: {class: HeadModuleConfiguration, ns: , asm: CapturyToolkit.Runtime}
+      data:
+        enabled: 1
+        sensitivity: 1
+        debugMode: 1
+        isHeadPositionTracked: 1
+        useRelativeHeadPosition: 1
+        isHeadRotationTracked: 1
+        isHeadDirectionEnabled: 1
+        headUpThreshold: 15
+        headDownThreshold: 15
+        headLeftThreshold: 20
+        headRightThreshold: 20
+        headJointName: Head
+        neckJointName: Neck
+    - rid: 5667218726784335947
+      type: {class: ArmModuleConfiguration, ns: , asm: CapturyToolkit.Runtime}
+      data:
+        enabled: 1
+        sensitivity: 1
+        debugMode: 1
+        isHandPositionTracked: 1
+        useRelativeHandPosition: 1
+        isHandRaiseTracked: 1
+        handRaiseThreshold: 0.3
+        handRaiseMinHeight: 0.1
+        leftHandJointName: LeftHand
+        rightHandJointName: RightHand
+        leftShoulderJointName: LeftShoulder
+        rightShoulderJointName: RightShoulder

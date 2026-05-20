@@ -78,6 +78,14 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
 
     #endregion
 
+    #region Events
+
+    public event System.Action<int, CapturyInput> OnPlayerReady;
+
+    public event System.Action<int> OnPlayerRemoved;
+
+    #endregion
+
     #region Unity Lifecycle
 
     private void Awake()
@@ -427,6 +435,10 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
 
         if (enableDebugLogging)
             Debug.Log($"MultiplayerMotionTrackingManager: {skeletonData.playerLabel} calibration complete!");
+
+        // notify listeners that this player is ready
+        if (skeletonData.inputDevice != null)
+            OnPlayerReady?.Invoke(skeletonData.playerNumber, skeletonData.inputDevice);
     }
 
     #endregion
@@ -482,6 +494,9 @@ public class MultiplayerMotionTrackingManager : MonoBehaviour, IMotionTrackingMa
             return;
 
         SkeletonTrackingData skeletonData = trackedSkeletons[skeletonId];
+
+        // notify listeners before teardown
+        OnPlayerRemoved?.Invoke(skeletonData.playerNumber);
 
         if (enableDebugLogging)
             Debug.Log($"MultiplayerMotionTrackingManager: Cleaning up {skeletonData.playerLabel}");

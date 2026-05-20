@@ -1,4 +1,5 @@
 {
+    "version": 1,
     "name": "CapturyInputActions",
     "maps": [
         {
@@ -9,7 +10,7 @@
                     "name": "IsBentOver",
                     "type": "Button",
                     "id": "90aad123-e17d-4909-b1e1-458015566dad",
-                    "expectedControlType": "Button",
+                    "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
@@ -862,5 +863,17 @@
             ]
         }
     ],
-    "controlSchemes": []
+    "controlSchemes": [
+        {
+            "name": "Captury",
+            "bindingGroup": "Captury",
+            "devices": [
+                {
+                    "devicePath": "<CapturyInput>",
+                    "isOptional": false,
+                    "isOR": false
+                }
+            ]
+        }
+    ]
 }

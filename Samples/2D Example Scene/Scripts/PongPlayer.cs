@@ -4,12 +4,24 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Controls;
 
+/// <summary>
+/// Pong paddle controller that works with Unity's PlayerInput component.
+/// 
+/// When using PlayerInputManager + CapturyPlayerInputBridge:
+///   - PlayerInput is automatically added and paired with the correct CapturyInput device
+///   - This script reads input through PlayerInput's actions (no manual device hunting)
+///   - The InputActionAsset is instanced automatically by PlayerInput
+///
+/// When using keyboard debug mode:
+///   - Set keyboardInput = true, no PlayerInput component needed
+///   - Uses legacy Input axes for movement
+/// </summary>
 public class PongPlayer : MonoBehaviour
 {
     [Header("Input Settings")]
-    [SerializeField] private InputActionAsset inputActions;
-    [SerializeField] private string actionMapName = "Head";
-    [SerializeField] private string armMapName = "Arms";
+    [SerializeField] private string headPositionActionName = "headPosition";
+    [SerializeField] private string leftHandPositionActionName = "lefthandPosition";
+    [SerializeField] private string rightHandPositionActionName = "rightHandPosition";
     [SerializeField] private int playerNumber = 1;
     
     [Header("Movement Settings")]
@@ -20,22 +32,23 @@ public class PongPlayer : MonoBehaviour
     
     [Header("Visual Settings")]
     [SerializeField] private float colorTransitionSpeed = 5f;
-    [SerializeField] private float countdownFadeDuration = 3.5f; // Matches countdown length
+    [SerializeField] private float countdownFadeDuration = 3.5f;
     
     [Header("Debug")]
     [SerializeField] private bool showDebugLogs = true;
     public bool keyboardInput = false;
     
-    private InputActionAsset instancedActions;
+    // PlayerInput-driven actions (resolved from the PlayerInput component)
+    private PlayerInput playerInput;
     private InputAction headPositionAction;
-    private InputAction leftHandRaiseAction, rightHandRaiseAction;
-    private CapturyInput myDevice;
+    private InputAction leftHandRaiseAction;
+    private InputAction rightHandRaiseAction;
 
     private bool isHorizontalPaddle = false;
 
     private bool isleftHandRaised = false;
     private bool isRightHandRaised = false;
-    private bool debugReady = false; // For keyboard debug mode
+    private bool debugReady = false;
 
     private SpriteRenderer spriteRenderer;
     private Color defaultColor = Color.white;
@@ -47,7 +60,6 @@ public class PongPlayer : MonoBehaviour
     void Awake()
     {
         isHorizontalPaddle = (playerNumber == 3 || playerNumber == 4);
-        Debug.Log($"[PongPlayer {playerNumber}] Is horizontal paddle: {isHorizontalPaddle}");
 
         spriteRenderer = GetComponent<SpriteRenderer>();
         if (spriteRenderer != null)
@@ -61,115 +73,41 @@ public class PongPlayer : MonoBehaviour
     
     private void SetupInput()
     {
-        if (inputActions == null)
+        if (keyboardInput) return;
+
+        // get the PlayerInput component — added automatically by PlayerInputManager
+        playerInput = GetComponent<PlayerInput>();
+        if (playerInput == null)
         {
-            Debug.LogWarning($"[PongPlayer {playerNumber}] No InputActionAsset assigned, motion tracking disabled");
+            Debug.LogWarning($"[PongPlayer {playerNumber}] No PlayerInput component found. " +
+                           "If using CapturyPlayerInputBridge, make sure the player prefab has a PlayerInput component.");
             return;
         }
 
-        FindMyDevice();
-        
-        if (myDevice == null && !keyboardInput)
-        {
-            Debug.LogWarning($"[PongPlayer {playerNumber}] Could not find CapturyInput device for Player{playerNumber}. Will retry each frame.");
-            return;
-        }
+        // resolve actions from PlayerInput's instanced action asset
+        // PlayerInput automatically instances the InputActionAsset and pairs it with the correct device
+        headPositionAction = playerInput.actions.FindAction(headPositionActionName);
+        leftHandRaiseAction = playerInput.actions.FindAction(leftHandPositionActionName);
+        rightHandRaiseAction = playerInput.actions.FindAction(rightHandPositionActionName);
 
-        instancedActions = Instantiate(inputActions);
-        Debug.Log($"[PongPlayer {playerNumber}] Created instanced InputActionAsset");
-        
-        var actionMap = instancedActions.FindActionMap(actionMapName);
-        if (actionMap == null)
-        {
-            Debug.LogError($"[PongPlayer {playerNumber}] Action map '{actionMapName}' not found!");
-        }
-        
-        headPositionAction = actionMap.FindAction("headPosition");
+        if (headPositionAction == null)
+            Debug.LogWarning($"[PongPlayer {playerNumber}] Could not find action '{headPositionActionName}'");
+        if (leftHandRaiseAction == null)
+            Debug.LogWarning($"[PongPlayer {playerNumber}] Could not find action '{leftHandPositionActionName}'");
+        if (rightHandRaiseAction == null)
+            Debug.LogWarning($"[PongPlayer {playerNumber}] Could not find action '{rightHandPositionActionName}'");
 
-        var armMap = instancedActions.FindActionMap(armMapName);
-        leftHandRaiseAction = armMap.FindAction("lefthandPosition");
-        rightHandRaiseAction = armMap.FindAction("rightHandPosition");
-    }
-    
-    private void FindMyDevice()
-    {
-        Debug.Log($"[PongPlayer {playerNumber}] ===== SEARCHING FOR MY DEVICE =====");
-        
-        int capturyCount = 0;
-        foreach (var device in InputSystem.devices)
+        if (showDebugLogs)
         {
-            if (device is CapturyInput capturyDevice)
-            {
-                capturyCount++;
-                string usages = device.usages.Count > 0 ? string.Join(", ", device.usages) : "none";
-                
-                Debug.Log($"[PongPlayer {playerNumber}]   CapturyInput #{capturyCount}:");
-                Debug.Log($"[PongPlayer {playerNumber}]     Name: {device.name}");
-                Debug.Log($"[PongPlayer {playerNumber}]     Usages: {usages}");
-                Debug.Log($"[PongPlayer {playerNumber}]     Path: {device.path}");
-                
-                bool isMyDevice = false;
-                foreach (var usage in device.usages)
-                {
-                    if (usage == $"Player{playerNumber}")
-                    {
-                        isMyDevice = true;
-                        break;
-                    }
-                }
-                
-                if (isMyDevice)
-                {
-                    myDevice = capturyDevice;
-                }
-            }
-        }
-        
-        Debug.Log($"[PongPlayer {playerNumber}] Total CapturyInput devices: {capturyCount}");
-        
-        if (myDevice != null)
-        {
-            Debug.Log($"[PongPlayer {playerNumber}] Successfully found my device: {myDevice.name}");
-        }
-        else
-        {
-            Debug.LogWarning($"[PongPlayer {playerNumber}] Could not find device with usage 'Player{playerNumber}'");
-        }
-    }
-    
-    void OnEnable()
-    {
-        headPositionAction?.Enable();
-        leftHandRaiseAction?.Enable();
-        rightHandRaiseAction?.Enable();
-    }
-    
-    void OnDisable()
-    {
-        headPositionAction?.Disable();
-        leftHandRaiseAction?.Disable();
-        rightHandRaiseAction?.Disable();
-    }
-    
-    void OnDestroy()
-    {
-        if (instancedActions != null)
-        {
-            instancedActions.Disable();
-            Destroy(instancedActions);
+            var devices = playerInput.devices;
+            string deviceNames = devices.Count > 0 ? string.Join(", ", devices) : "none";
+            Debug.Log($"[PongPlayer {playerNumber}] PlayerInput setup complete — " +
+                     $"Scheme: {playerInput.currentControlScheme}, Devices: {deviceNames}");
         }
     }
     
     void Update()
     {
-        if (myDevice == null && !keyboardInput)
-        {
-            if (Time.frameCount % 60 == 0)
-            {
-                FindMyDevice();
-            }
-        }
-
         HandleHandRaiseInput();
         HandleDebugReadyInput();
         UpdateReadyState();
@@ -179,6 +117,8 @@ public class PongPlayer : MonoBehaviour
 
     private void HandleHandRaiseInput()
     {
+        if (keyboardInput) return;
+
         float leftHandValue = leftHandRaiseAction?.ReadValue<Vector3>().y ?? 0f;
         float rightHandValue = rightHandRaiseAction?.ReadValue<Vector3>().y ?? 0f;
 
@@ -187,7 +127,7 @@ public class PongPlayer : MonoBehaviour
             if (!isleftHandRaised)
             {
                 isleftHandRaised = true;
-                Debug.Log($"[PongPlayer {playerNumber}] Left hand raised (value: {leftHandValue})");
+                if (showDebugLogs) Debug.Log($"[PongPlayer {playerNumber}] Left hand raised (value: {leftHandValue})");
             }
         }
         else
@@ -195,7 +135,7 @@ public class PongPlayer : MonoBehaviour
             if (isleftHandRaised)
             {
                 isleftHandRaised = false;
-                Debug.Log($"[PongPlayer {playerNumber}] Left hand lowered (value: {leftHandValue})");
+                if (showDebugLogs) Debug.Log($"[PongPlayer {playerNumber}] Left hand lowered (value: {leftHandValue})");
             }
         }
 
@@ -204,7 +144,7 @@ public class PongPlayer : MonoBehaviour
             if (!isRightHandRaised)
             {
                 isRightHandRaised = true;
-                Debug.Log($"[PongPlayer {playerNumber}] Right hand raised (value: {rightHandValue})");
+                if (showDebugLogs) Debug.Log($"[PongPlayer {playerNumber}] Right hand raised (value: {rightHandValue})");
             }
         }
         else
@@ -212,7 +152,7 @@ public class PongPlayer : MonoBehaviour
             if (isRightHandRaised)
             {
                 isRightHandRaised = false;
-                Debug.Log($"[PongPlayer {playerNumber}] Right hand lowered (value: {rightHandValue})");
+                if (showDebugLogs) Debug.Log($"[PongPlayer {playerNumber}] Right hand lowered (value: {rightHandValue})");
             }
         }
     }
@@ -221,7 +161,6 @@ public class PongPlayer : MonoBehaviour
     {
         if (!keyboardInput) return;
 
-        // Press 1 to toggle P1 ready, 2 to toggle P2 ready
         if (playerNumber == 1 && Input.GetKeyDown(KeyCode.Alpha1))
         {
             debugReady = !debugReady;
@@ -243,17 +182,15 @@ public class PongPlayer : MonoBehaviour
         {
             if (isReady)
             {
-                // Set target color to player color
                 if (PongUIManager.Instance != null)
                 {
                     targetColor = PongUIManager.Instance.GetPlayerColor(playerNumber);
                 }
                 else
                 {
-                    // Fallback colors if UIManager not available
                     targetColor = playerNumber == 1 
-                        ? new Color(1f, 0f, 1f)  // Magenta
-                        : new Color(0f, 1f, 1f); // Cyan
+                        ? new Color(1f, 0f, 1f)
+                        : new Color(0f, 1f, 1f);
                 }
                 Debug.Log($"[PongPlayer {playerNumber}] Now READY - changing to player color: {targetColor}");
             }
@@ -268,8 +205,6 @@ public class PongPlayer : MonoBehaviour
     private void UpdatePaddleColor()
     {
         if (spriteRenderer == null) return;
-
-        // Smoothly transition to target color
         spriteRenderer.color = Color.Lerp(spriteRenderer.color, targetColor, Time.deltaTime * colorTransitionSpeed);
     }
 
@@ -289,38 +224,21 @@ public class PongPlayer : MonoBehaviour
                 float verticalInput = Input.GetAxis("Vertical");
                 newPosition = transform.position.y + (verticalInput * moveSpeed * Time.deltaTime);
             }
-            
-            if (showDebugLogs && Time.frameCount % 120 == 0)
-            {
-                Debug.Log($"[PongPlayer {playerNumber}] KEYBOARD MODE - NewPos: {newPosition}");
-            }
         }
         else
         {
-            if (myDevice == null)
-            {
-                if (showDebugLogs && Time.frameCount % 300 == 0)
-                {
-                    Debug.LogWarning($"[PongPlayer {playerNumber}] myDevice is NULL in Update!");
-                }
-                return;
-            }
+            if (headPositionAction == null) return;
 
-            Vector3 headPos = myDevice.headPosition.ReadValue();
+            Vector3 headPos = headPositionAction.ReadValue<Vector3>();
             newPosition = headPos.z;
             
             if (showDebugLogs && Time.frameCount % 60 == 0)
             {
-                Debug.Log($"[PongPlayer {playerNumber}] TRACKING MODE - Device: {myDevice.name}, Head pos: {headPos}, Z: {headPos.z}, NewPos: {newPosition}");
+                Debug.Log($"[PongPlayer {playerNumber}] TRACKING MODE — Head pos: {headPos}, Z: {headPos.z}");
             }
         }
 
         float clampedPosition = Mathf.Clamp(newPosition, minY, maxY);
-        
-        if (showDebugLogs && Time.frameCount % 120 == 0 && clampedPosition != newPosition)
-        {
-            Debug.Log($"[PongPlayer {playerNumber}] Position clamped from {newPosition} to {clampedPosition} (bounds: {minY} to {maxY})");
-        }
 
         Vector3 oldPosition = transform.position;
         if (isHorizontalPaddle)
@@ -331,30 +249,17 @@ public class PongPlayer : MonoBehaviour
         {
             transform.position = new Vector3(transform.position.x, clampedPosition, transform.position.z);
         }
-        
-        if (showDebugLogs && Time.frameCount % 120 == 0)
-        {
-            Debug.Log($"[PongPlayer {playerNumber}] Position: {oldPosition} -> {transform.position}");
-        }
     }
 
     public void SetPlayerNumber(int number)
     {
-        Debug.Log($"[PongPlayer {playerNumber}] SetPlayerNumber called, changing from {playerNumber} to {number}");
         playerNumber = number;
-        
-        myDevice = null;
-        FindMyDevice();
+        isHorizontalPaddle = (playerNumber == 3 || playerNumber == 4);
     }   
 
     public bool AreBothHandsRaised()
     {
-        // In keyboard debug mode, use debug ready state
-        if (keyboardInput)
-        {
-            return debugReady;
-        }
-        
+        if (keyboardInput) return debugReady;
         return isleftHandRaised && isRightHandRaised;
     }
 
@@ -377,10 +282,7 @@ public class PongPlayer : MonoBehaviour
         {
             elapsed += Time.deltaTime;
             float t = elapsed / duration;
-            
-            // Ease out for a nice feel
             float easedT = 1f - Mathf.Pow(1f - t, 2f);
-            
             spriteRenderer.color = Color.Lerp(startColor, defaultColor, easedT);
             yield return null;
         }

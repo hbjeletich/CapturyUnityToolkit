@@ -1,11 +1,23 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
+/// <summary>
+/// Manages pong player spawning and positioning.
+/// 
+/// In tracking mode:
+///   - CapturyPlayerInputBridge calls PlayerInputManager.JoinPlayer() when skeletons are ready
+///   - PlayerInputManager spawns the prefab with a paired PlayerInput
+///   - This script listens to PlayerInputManager.onPlayerJoined to configure positioning/bounds
+///
+/// In keyboard debug mode:
+///   - Press Enter to add a debug player (spawned manually without PlayerInput)
+/// </summary>
 public class PongPlayerManager : MonoBehaviour
 {
     [Header("Player Setup")]
-    [SerializeField] private GameObject playerPrefab;
+    [SerializeField] private GameObject playerPrefab; // only used for keyboard debug mode
     [SerializeField] private int maxPlayers = 4;
     
     [Header("Spawn Positions")]
@@ -15,15 +27,14 @@ public class PongPlayerManager : MonoBehaviour
     [SerializeField] private Transform bottomSpawn;  // Player 4
     
     [Header("Paddle Constraints")]
-    [SerializeField] private Vector2 verticalPaddleBounds = new Vector2(-4f, 4f);  // Y bounds for left/right
-    [SerializeField] private Vector2 horizontalPaddleBounds = new Vector2(-8f, 8f); // X bounds for top/bottom
+    [SerializeField] private Vector2 verticalPaddleBounds = new Vector2(-4f, 4f);
+    [SerializeField] private Vector2 horizontalPaddleBounds = new Vector2(-8f, 8f);
     
     [Header("Debug")]
     [SerializeField] private bool keyboardDebugMode = false;
     [SerializeField] private bool showDebugLogs = true;
     
     private Dictionary<int, GameObject> spawnedPlayers = new Dictionary<int, GameObject>();
-    private MultiplayerMotionTrackingManager motionManager;
 
     private bool allowNewPlayers = true;
 
@@ -31,33 +42,14 @@ public class PongPlayerManager : MonoBehaviour
 
     void Awake()
     {
-        // singleton pattern
         if (Instance == null)
-        {
             Instance = this;
-        }
         else
-        {
             Destroy(gameObject);
-        }
     }
     
     void Start()
     {
-        // find the motion tracking manager
-        motionManager = MultiplayerMotionTrackingManager.Instance;
-        
-        if (motionManager != null)
-        {
-            // subscribe to skeleton events
-            if (showDebugLogs)
-                Debug.Log("PongPlayerManager: Connected to MultiplayerMotionTrackingManager");
-        }
-        else if (!keyboardDebugMode)
-        {
-            Debug.LogWarning("PongPlayerManager: MultiplayerMotionTrackingManager not found! Players won't spawn automatically.");
-        }
-
         verticalPaddleBounds = new Vector2(
             PongGameManager.Instance.GetBoundaryMins().y + 1f,
             PongGameManager.Instance.GetBoundaryMaxs().y - 1f
@@ -67,59 +59,117 @@ public class PongPlayerManager : MonoBehaviour
             PongGameManager.Instance.GetBoundaryMins().x + 1f,
             PongGameManager.Instance.GetBoundaryMaxs().x - 1f
         );
+
+        // in tracking mode, listen for players joined through PlayerInputManager
+        if (!keyboardDebugMode)
+        {
+            var pim = PlayerInputManager.instance;
+            if (pim != null)
+            {
+                pim.onPlayerJoined += OnPlayerJoined;
+                pim.onPlayerLeft += OnPlayerLeft;
+
+                if (showDebugLogs)
+                    Debug.Log("PongPlayerManager: Listening to PlayerInputManager events");
+            }
+            else
+            {
+                Debug.LogWarning("PongPlayerManager: No PlayerInputManager found! " +
+                               "Add PlayerInputManager + CapturyPlayerInputBridge to the scene.");
+            }
+        }
+    }
+
+    void OnDestroy()
+    {
+        if (!keyboardDebugMode && PlayerInputManager.instance != null)
+        {
+            PlayerInputManager.instance.onPlayerJoined -= OnPlayerJoined;
+            PlayerInputManager.instance.onPlayerLeft -= OnPlayerLeft;
+        }
     }
     
     void Update()
     {
-        // check for new skeletons in motion tracking mode
-        if (motionManager != null && !keyboardDebugMode && allowNewPlayers)
-        {
-            CheckForNewPlayers();
-        }
-        
         // keyboard debug mode: press enter to add player
         if (keyboardDebugMode && Input.GetKeyDown(KeyCode.Return))
         {
             AddDebugPlayer();
         }
     }
-    
-    private void CheckForNewPlayers()
+
+    /// <summary>
+    /// Called by PlayerInputManager when a player is joined (via CapturyPlayerInputBridge).
+    /// The PlayerInput component is already on the spawned prefab, paired with the correct device.
+    /// </summary>
+    private void OnPlayerJoined(PlayerInput playerInput)
     {
-        if(!allowNewPlayers)
+        if (!allowNewPlayers)
+        {
+            if (showDebugLogs)
+                Debug.Log("PongPlayerManager: New player blocked — game already started.");
+            Destroy(playerInput.gameObject);
             return;
-
-
-        List<int> allPlayerNumbers = motionManager.GetAllPlayerNumbers();
-        
-        foreach (int playerNumber in allPlayerNumbers)
-        {
-            // if we haven't spawned this player yet, spawn them
-            if (!spawnedPlayers.ContainsKey(playerNumber) && playerNumber <= maxPlayers)
-            {
-                SpawnPlayer(playerNumber, false);
-            }
         }
-        
-        // clean up players that are no longer tracked
-        List<int> playersToRemove = new List<int>();
-        foreach (int playerNumber in spawnedPlayers.Keys)
+
+        // playerIndex is zero-based, our player numbers are one-based
+        int playerNumber = playerInput.playerIndex + 1;
+
+        if (playerNumber > maxPlayers)
         {
-            if (!allPlayerNumbers.Contains(playerNumber))
-            {
-                playersToRemove.Add(playerNumber);
-            }
+            if (showDebugLogs)
+                Debug.Log($"PongPlayerManager: Player {playerNumber} exceeds max ({maxPlayers}), rejecting.");
+            Destroy(playerInput.gameObject);
+            return;
         }
-        
-        foreach (int playerNumber in playersToRemove)
+
+        GameObject playerObject = playerInput.gameObject;
+        playerObject.name = $"Player{playerNumber}";
+
+        // position the player at the correct spawn point
+        Transform spawnTransform = GetSpawnTransform(playerNumber);
+        if (spawnTransform != null)
         {
-            RemovePlayer(playerNumber);
+            playerObject.transform.position = spawnTransform.position;
+            playerObject.transform.rotation = spawnTransform.rotation;
+        }
+
+        // configure the PongPlayer component
+        PongPlayer pongPlayer = playerObject.GetComponent<PongPlayer>();
+        if (pongPlayer != null)
+        {
+            pongPlayer.SetPlayerNumber(playerNumber);
+            pongPlayer.keyboardInput = false;
+            SetPlayerBounds(pongPlayer, playerNumber);
+
+            if (playerNumber > 2)
+                playerObject.transform.Rotate(0f, 0f, 90f);
+
+            if (showDebugLogs)
+                Debug.Log($"PongPlayerManager: Player {playerNumber} joined at {playerObject.transform.position}");
+        }
+
+        spawnedPlayers[playerNumber] = playerObject;
+        PongGameManager.Instance.ActivateNextBoundary(playerNumber);
+    }
+
+    private void OnPlayerLeft(PlayerInput playerInput)
+    {
+        // find which player number this was
+        int playerNumber = playerInput.playerIndex + 1;
+        
+        if (spawnedPlayers.ContainsKey(playerNumber))
+        {
+            if (showDebugLogs)
+                Debug.Log($"PongPlayerManager: Player {playerNumber} left");
+
+            spawnedPlayers.Remove(playerNumber);
+            PongGameManager.Instance.DeactivateBoundary(playerNumber);
         }
     }
     
     private void AddDebugPlayer()
     {
-        // find next available player slot
         int nextPlayerNumber = spawnedPlayers.Count + 1;
         
         if (nextPlayerNumber > maxPlayers)
@@ -129,17 +179,12 @@ public class PongPlayerManager : MonoBehaviour
             return;
         }
         
-        SpawnPlayer(nextPlayerNumber, true);
+        SpawnDebugPlayer(nextPlayerNumber);
     }
     
-    private void SpawnPlayer(int playerNumber, bool isKeyboardMode)
+    private void SpawnDebugPlayer(int playerNumber)
     {
-        if(!allowNewPlayers)
-        {
-            if (showDebugLogs)
-                Debug.Log("PongPlayerManager: New player spawn blocked - game already started.");
-            return;
-        }
+        if (!allowNewPlayers) return;
 
         if (playerPrefab == null)
         {
@@ -147,58 +192,38 @@ public class PongPlayerManager : MonoBehaviour
             return;
         }
         
-        // get spawn position and rotation based on player number
         Transform spawnTransform = GetSpawnTransform(playerNumber);
         if (spawnTransform == null)
         {
-            Debug.LogError($"PongPlayerManager: No spawn position configured for player {playerNumber}!");
+            Debug.LogError($"PongPlayerManager: No spawn position for player {playerNumber}!");
             return;
         }
         
-        // instantiate the player
         GameObject playerObject = Instantiate(playerPrefab, spawnTransform.position, spawnTransform.rotation);
         playerObject.name = $"Player{playerNumber}";
         
-        // configure the PongPlayer component
         PongPlayer pongPlayer = playerObject.GetComponent<PongPlayer>();
         if (pongPlayer != null)
         {            
             pongPlayer.SetPlayerNumber(playerNumber);
-            
-            pongPlayer.keyboardInput = isKeyboardMode;
-            
+            pongPlayer.keyboardInput = true;
             SetPlayerBounds(pongPlayer, playerNumber);
             
-            if (showDebugLogs)
-                Debug.Log($"PongPlayerManager: Spawned Player {playerNumber} at {spawnTransform.position} (Keyboard: {isKeyboardMode})");
-
             if (playerNumber > 2)
                 playerObject.transform.Rotate(0f, 0f, 90f);
+
+            if (showDebugLogs)
+                Debug.Log($"PongPlayerManager: Spawned debug Player {playerNumber} at {spawnTransform.position}");
         }
         else
         {
-            Debug.LogError("PongPlayerManager: Player prefab doesn't have PongPlayer component!");
+            Debug.LogError("PongPlayerManager: Prefab missing PongPlayer component!");
             Destroy(playerObject);
             return;
         }
         
         spawnedPlayers.Add(playerNumber, playerObject);
-
         PongGameManager.Instance.ActivateNextBoundary(playerNumber);
-    }
-    
-    private void RemovePlayer(int playerNumber)
-    {
-        if (spawnedPlayers.TryGetValue(playerNumber, out GameObject playerObject))
-        {
-            if (showDebugLogs)
-                Debug.Log($"PongPlayerManager: Removing Player {playerNumber}");
-            
-            Destroy(playerObject);
-            spawnedPlayers.Remove(playerNumber);
-
-            PongGameManager.Instance.DeactivateBoundary(playerNumber);
-        }
     }
     
     private Transform GetSpawnTransform(int playerNumber)
@@ -215,12 +240,8 @@ public class PongPlayerManager : MonoBehaviour
     
     private void SetPlayerBounds(PongPlayer player, int playerNumber)
     {
-        // players 1 & 2 move vertically (left/right)
-        // players 3 & 4 move horizontally (top/bottom)
-        
         if (playerNumber == 1 || playerNumber == 2)
         {
-            // vertical
             player.GetType().GetField("minY", 
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
                 ?.SetValue(player, verticalPaddleBounds.x);
@@ -231,7 +252,6 @@ public class PongPlayerManager : MonoBehaviour
         }
         else
         {
-            // horizontal paddles
             player.GetType().GetField("minY", 
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
                 ?.SetValue(player, horizontalPaddleBounds.x);
@@ -244,27 +264,19 @@ public class PongPlayerManager : MonoBehaviour
 
     public bool ReadyToStartGame()
     {
-        foreach(int playerNumber in spawnedPlayers.Keys)
+        foreach (int playerNumber in spawnedPlayers.Keys)
         {
             GameObject playerObject = spawnedPlayers[playerNumber];
             PongPlayer pongPlayer = playerObject.GetComponent<PongPlayer>();
-            if (pongPlayer != null)
-            {
-                if (!pongPlayer.AreBothHandsRaised())
-                {
-                    return false; // at least one player isn't ready
-                }
-            }
+            if (pongPlayer != null && !pongPlayer.AreBothHandsRaised())
+                return false;
         }
 
-        if(spawnedPlayers.Count > 0) allowNewPlayers = false; // lock in players once game starts
+        if (spawnedPlayers.Count > 0) allowNewPlayers = false;
         return spawnedPlayers.Count > 0;
     }
     
-    public int GetPlayerCount()
-    {
-        return spawnedPlayers.Count;
-    }
+    public int GetPlayerCount() => spawnedPlayers.Count;
     
     public GameObject GetPlayerObject(int playerNumber)
     {

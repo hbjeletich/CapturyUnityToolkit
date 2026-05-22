@@ -28,6 +28,8 @@ Unity package for motion capture tracking using Captury and Unity's Input System
 
 This package includes the **Captury Unity Plugin** (MIT License) in `/Runtime/ThirdParty/Captury/` and requires the **Unity Input System**.
 
+You can find Captury's Unity tutorial on Youtube [here.](https://www.youtube.com/watch?v=06uo_TKcK9I)
+
 ### Install via Package Manager
 
 1. Open Unity Package Manager: `Window → Package Manager`

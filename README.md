@@ -156,6 +156,75 @@ public class DirectInputExample : MonoBehaviour
 }
 ```
 
+### Reading the Input Actions Map
+
+The toolkit also comes with an input actions map already hooked up to the input device. 
+
+```csharp
+using UnityEngine;
+using UnityEngine.InputSystem;
+
+public class InputActionMapExample : MonoBehaviour
+{
+    // assign the input action asset in the inspector
+    public InputActionAsset capturyInputActions;
+
+    // variables for the input actions themselves
+    private InputAction footRaiseAction;
+    private InputAction weightShiftXAction;
+    private InputAction walkingAction;
+
+    void Awake()
+    {
+        // each module has its own map within the input action asset
+        var footMap = capturyInputActions.FindActionMap("Foot");
+        var torsoMap = capturyInputActions.FindActionMap("Torso");
+
+        // reference the actions through their input map
+        footRaiseAction = footMap.FindAction("FootRaised");
+        weightShiftXAction = torsoMap.FindAction("WeightShiftX");
+        walkingAction = footMap.FindAction("IsWalking");
+
+        // for boolean-based actions, you can add a listener
+        footRaiseAction.performed += OnFootRaise;
+        walkingAction.performed += OnWalking;
+    }
+
+    void OnEnable()
+    {
+        // ensure each action is enabled
+        footRaiseAction.Enable();
+        weightShiftXAction.Enable();
+        walkingAction.Enable();
+    }
+
+    void OnDisable()
+    {
+        // ensure each action is disabled
+        footRaiseAction.Disable();
+        weightShiftXAction.Disable();
+        walkingAction.Disable();
+    }
+
+    void Update()
+    {
+        // read the float-based action
+        float weightShift = weightShiftXAction.ReadValue<float>();
+        Debug.Log($"Weight Shift X: {weightShift}");
+    }
+
+    private void OnFootRaise(InputAction.CallbackContext ctx)
+    {
+        Debug.Log("Foot was raised!");
+    }
+
+    private void OnWalking(InputAction.CallbackContext ctx)
+    {
+        Debug.Log("Walking state changed!");
+    }
+}
+```
+
 ---
 
 ## Accessing Tracking Data — Multiplayer
